@@ -19,7 +19,7 @@ with app.app_context():
 @app.route('/')
 def index():
     """Serves the main frontend page."""
-    return send_from_directory(app.static_folder, 'index.html')
+    return send_from_directory('.', 'index.html')
 
 @app.route('/static/<path:path>')
 def serve_static(path):
