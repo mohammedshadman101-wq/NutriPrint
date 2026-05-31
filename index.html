@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NutriPrint — AI Meal Plan Generator for Karnataka Schools</title>
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/print.css" media="print">
+    
+    <!-- Favicon / Brand Styling -->
+    <meta name="theme-color" content="#1D9E75">
+    <meta name="description" content="NutriPrint generates customized, nutrient-balanced, local weekly meal plan posters for schools across Karnataka, raising health awareness directly in kitchens.">
+</head>
+<body>
+
+    <!-- ==========================================
+       OFFICIAL GOVT BANNER BAR
+       ========================================== -->
+    <div class="govt-bar">
+        <div class="left-links">
+            <span>GOVERNMENT OF KARNATAKA / ಕರ್ನಾಟಕ ಸರ್ಕಾರ</span>
+            <span>|</span>
+            <span>DEPARTMENT OF HEALTH & FAMILY WELFARE / ಆರೋಗ್ಯ ಮತ್ತು ಕುಟುಂಬ ಕಲ್ಯಾಣ ಇಲಾಖೆ</span>
+        </div>
+        <div class="right-links">
+            <span class="lang-kn">POSHAN Abhiyaan / ಪೋಷಣ್ ಅಭಿಯಾನ</span>
+            <span>|</span>
+            <span style="color: var(--accent);">NHM Karnataka / ರಾಷ್ಟ್ರೀಯ ಆರೋಗ್ಯ ಅಭಿಯಾನ</span>
+        </div>
+    </div>
+
+    <!-- ==========================================
+       MAIN NAVIGATION HEADER
+       ========================================== -->
+    <header class="main-header">
+        <div class="header-container">
+            <div class="logo-block">
+                <!-- High Fidelity Stylized Government Emblem in sharp SVG -->
+                <svg class="govt-emblem-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="46" fill="#1D9E75" stroke="#E08E0B" stroke-width="3"/>
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="#FFFFFF" stroke-dasharray="3,3" stroke-width="1"/>
+                    <!-- Double headed eagle / lions stylized shape -->
+                    <path d="M50 20 L58 35 L52 35 L56 50 L44 50 L48 35 L42 35 Z" fill="#E08E0B"/>
+                    <path d="M38 52 C38 48 42 45 50 45 C58 45 62 48 62 52 L62 70 C62 74 58 76 50 76 C42 76 38 74 38 70 Z" fill="#FFFFFF" opacity="0.9"/>
+                    <path d="M45 55 L55 55 M45 62 L55 62 M48 68 L52 68" stroke="#1D9E75" stroke-width="2" stroke-linecap="round"/>
+                    <!-- Small Ashok Chakra detail -->
+                    <circle cx="50" cy="72" r="3" fill="#E08E0B"/>
+                </svg>
+                <div class="logo-text">
+                    <h1>NutriPrint <span>ನ್ಯೂಟ್ರಿಪ್ರಿಂಟ್</span></h1>
+                    <p>AI Meal Planner for Karnataka Schools</p>
+                </div>
+                <div class="logo-tagline">
+                    "ಮಕ್ಕಳ ಸದೃಢ ಆರೋಗ್ಯವೇ ದೇಶದ ಸಂಪತ್ತು"<br>
+                    "Children's Robust Health is the Nation's Wealth"
+                </div>
+            </div>
+
+            <!-- Hamburger Button for mobile -->
+            <button class="hamburger-btn" id="menu-toggle">☰</button>
+
+            <!-- Navigation Links -->
+            <ul class="nav-menu" id="nav-links">
+                <li>
+                    <a class="nav-link active" data-target="home">
+                        <span>Home</span>
+                        <span class="kn-nav">ಮುಖಪುಟ</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="nav-link" data-target="bmi">
+                        <span>BMI Tracker</span>
+                        <span class="kn-nav">ಬಿಎಮ್ಐ ಟ್ರ್ಯಾಕರ್</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="nav-link" data-target="generator">
+                        <span>Planner</span>
+                        <span class="kn-nav">ಆಹಾರ ನಿಯೋಜಕ</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="nav-link" data-target="library">
+                        <span>Nutrition Catalog</span>
+                        <span class="kn-nav">ಪೌಷ್ಟಿಕಾಂಶ ಮಾಹಿತಿ</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="nav-link" data-target="about">
+                        <span>About Team</span>
+                        <span class="kn-nav">ನಮ್ಮ ಬಗ್ಗೆ</span>
+                    </a>
+                </li>
+                <li>
+                    <button class="header-btn" onclick="app.navigateTo('generator')">Generate Plan</button>
+                </li>
+            </ul>
+        </div>
+    </header>
+
+    <!-- ==========================================
+       MAIN CONTENT CONTAINER
+       ========================================== -->
+    <main>
+
+        <!-- 1. LANDING PAGE VIEW -->
+        <section id="home-section" class="app-section active">
+            <!-- Hero Banner -->
+            <div class="hero-banner">
+                <div class="hero-badge">
+                    <span></span> Official POSHAN Abhiyaan Partner Portal
+                </div>
+                <h2>Fighting Child Malnutrition in Karnataka <br>Through <span>School-to-Kitchen</span> Action</h2>
+                <p class="hero-subtitle">
+                    A novel interdisciplinary platform enabling school teachers to instantly generate, customize, and print 
+                    nutrient-balanced A4 meal plan posters. Empowering parents at home without extra effort.
+                </p>
+                <div class="hero-ctas">
+                    <button class="btn-primary" onclick="app.navigateTo('bmi')">
+                        Assess Student BMI / ಆರೋಗ್ಯ ತಪಾಸಣೆ
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </button>
+                    <button class="btn-secondary" onclick="app.navigateTo('generator')">Generate Meal Plan</button>
+                </div>
+            </div>
+
+            <!-- Animated Statistics Grid -->
+            <div class="stats-section">
+                <div class="stats-grid" id="stats-container">
+                    <div class="stat-card">
+                        <div class="stat-number"><span id="stat-junk-india">0</span>%</div>
+                        <p>Indian Children eating junk food weekly</p>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number"><span id="stat-junk-kar">0</span>%</div>
+                        <p>Karnataka Children eating junk daily</p>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">+<span id="stat-obesity">0</span>%</div>
+                        <p>Annual growth in childhood obesity</p>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number"><span id="stat-students">0</span>Cr+</div>
+                        <p>School children reached in Karnataka</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- How It Works Flow -->
+            <div class="how-it-works-section">
+                <div class="section-title-wrapper">
+                    <span class="section-tag">Empowerment Model</span>
+                    <h2 class="section-title">How It Works</h2>
+                </div>
+                <div class="steps-grid">
+                    <div class="step-card">
+                        <div class="step-icon-box">
+                            📏
+                            <div class="step-number">1</div>
+                        </div>
+                        <h3>BMI Health Assessment</h3>
+                        <p>Teacher measures student's BMI. Underweight or overweight classifications are dynamically mapped to customized portion needs.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-icon-box">
+                            ⚙️
+                            <div class="step-number">2</div>
+                        </div>
+                        <h3>AI Generates Meal Poster</h3>
+                        <p>Rule engine optimizes and creates a balanced, zero-repeat, highly local weekly food chart under ₹50 per meal.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-icon-box">
+                            🖨️
+                            <div class="step-number">3</div>
+                        </div>
+                        <h3>Print & Send Home</h3>
+                        <p>Teacher prints the A4 poster, sends it home with children. Parents stick it on the kitchen wall as a daily visual guide.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Local Foods Showcase -->
+            <div class="showcase-section">
+                <div class="section-title-wrapper">
+                    <span class="section-tag">Purely Karnataka</span>
+                    <h2 class="section-title">Local Grains & Diet Showcase</h2>
+                </div>
+                <div class="showcase-grid">
+                    <div class="showcase-card">
+                        <div class="showcase-img">🌾</div>
+                        <div class="showcase-info">
+                            <h3>Ragi Mudde <span class="kn-name">(ರಾಗಿ ಮುದ್ದೆ)</span></h3>
+                            <p class="description">Rich in Calcium and Iron. Extremely dense in energy, keeping children active and preventing anemia.</p>
+                            <div class="showcase-macros">
+                                <div>Prot: <span>5.2g</span></div>
+                                <div>Calc: <span>344mg</span></div>
+                                <div>Iron: <span>3.9mg</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="showcase-card">
+                        <div class="showcase-img">🥞</div>
+                        <div class="showcase-info">
+                            <h3>Ragi Dosa <span class="kn-name">(ರಾಗಿ ದೋಸೆ)</span></h3>
+                            <p class="description">Probiotic fermented breakfast rich in calcium, easy on child digestion, and tastes incredible.</p>
+                            <div class="showcase-macros">
+                                <div>Prot: <span>5.8g</span></div>
+                                <div>Calc: <span>310mg</span></div>
+                                <div>Iron: <span>3.5mg</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="showcase-card">
+                        <div class="showcase-img">🫓</div>
+                        <div class="showcase-info">
+                            <h3>Jowar Roti <span class="kn-name">(ಜೋಳದ ರೊಟ್ಟಿ)</span></h3>
+                            <p class="description">Traditional millet bread packed with protein, vitamin B3 (niacin), and essential micro-fibers.</p>
+                            <div class="showcase-macros">
+                                <div>Prot: <span>8.4g</span></div>
+                                <div>Calc: <span>28mg</span></div>
+                                <div>Iron: <span>4.1mg</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="showcase-card">
+                        <div class="showcase-img">🥥</div>
+                        <div class="showcase-info">
+                            <h3>Coconut Rice <span class="kn-name">(ತೆಂಗಿನಕಾಯಿ ಅನ್ನ)</span></h3>
+                            <p class="description">Healthy plant fats from fresh coconut blended with coastal rice. Keeps active brains highly fueled.</p>
+                            <div class="showcase-macros">
+                                <div>Prot: <span>4.5g</span></div>
+                                <div>Calc: <span>12mg</span></div>
+                                <div>Iron: <span>1.8mg</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fictional but Realistic School Quotes -->
+            <div class="testimonial-section">
+                <div class="section-title-wrapper">
+                    <span class="section-tag">Impact stories</span>
+                    <h2 class="section-title">Feedback from Karnataka Schools</h2>
+                </div>
+                <div class="testimonial-container">
+                    <div class="testimonial-card">
+                        <p>
+                            "Sticking the NutriPrint poster on kitchen walls has completely changed parental perspectives. Earlier, children brought chips and bakery breads. Now, mothers prepare ragi dosa and upma based on the weekly schedule."
+                        </p>
+                        <div class="author-block">
+                            <div class="author-avatar">MS</div>
+                            <div class="author-info">
+                                <h4>Manjunath S.</h4>
+                                <p>Headmaster, Govt Primary School, Mangalore</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="testimonial-card">
+                        <p>
+                            "As a teacher, I had no time to consult nutritionists. NutriPrint generates an optimized calendar instantly, prioritizing regional foods like jowar roti. The parents love the bilingual Kannada+English poster!"
+                        </p>
+                        <div class="author-block">
+                            <div class="author-avatar">RD</div>
+                            <div class="author-info">
+                                <h4>Radha Devi</h4>
+                                <p>Class 5 Teacher, Rural Block School, Shivamogga</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. STUDENT GROWTH & BMI TRACKER VIEW -->
+        <section id="bmi-section" class="app-section">
+            <div class="generator-section">
+                <div class="section-title-wrapper">
+                    <span class="section-tag">Student Growth Assessment</span>
+                    <h2 class="section-title">Student Growth & BMI Tracker</h2>
+                </div>
+
+                <div class="generator-layout">
+                    <!-- Left column: inputs -->
+                    <div class="form-panel">
+                        <form id="bmi-form" onsubmit="app.submitBMIForm(event)">
+                            <div class="form-group">
+                                <label for="bmi_student_name">Student Name / ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು</label>
+                                <input type="text" id="bmi_student_name" class="form-control" placeholder="e.g. Mohammed Shadman" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="bmi_age">Age / ವಯಸ್ಸು <span>(5 - 15 Years)</span></label>
+                                <input type="number" id="bmi_age" class="form-control" min="5" max="15" value="10" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="bmi_gender">Gender / ಲಿಂಗ</label>
+                                <select id="bmi_gender" class="form-control">
+                                    <option value="Boy">Boy (ಬಾಲಕ)</option>
+                                    <option value="Girl">Girl (ಬಾಲಕಿ)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="bmi_height">Height / ಎತ್ತರ <span>(in cm)</span></label>
+                                <input type="number" id="bmi_height" class="form-control" placeholder="e.g. 135" min="80" max="200" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="bmi_weight">Weight / ತೂಕ <span>(in kg)</span></label>
+                                <input type="number" id="bmi_weight" class="form-control" placeholder="e.g. 30" min="10" max="120" step="0.1" required>
+                            </div>
+                            <button type="submit" class="btn-primary btn-generate">
+                                Calculate Health Status / ಮೌಲ್ಯಮಾಪನ 📊
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Right Column: Visual Report card -->
+                    <div class="preview-panel">
+                        <div class="preview-header">
+                            <div class="preview-title">
+                                <span class="status-dot active"></span> Growth Assessment Report (ಆರೋಗ್ಯ ವರದಿ ಪತ್ರ)
+                            </div>
+                        </div>
+
+                        <!-- Empty state -->
+                        <div class="empty-state" id="bmi-empty">
+                            <div class="empty-state-icon">📏</div>
+                            <h3>No BMI Assessment Loaded</h3>
+                            <p>Enter the child's height, weight, and name on the left to calculate their growth classification according to national nutritional growth indexes.</p>
+                        </div>
+
+                        <!-- Report Card view -->
+                        <div id="bmi-report-view" style="display: none; padding: 40px; flex-direction: column; justify-content: space-between; height: 100%;">
+                            <div style="display: flex; flex-direction: column; gap: 15px;">
+                                <div style="display: flex; justify-content: space-between; border-bottom: 2px dashed var(--border); padding-bottom: 15px;">
+                                    <div>
+                                        <h3 style="font-size: 22px; color: var(--primary-dark);" id="rep-student-name">Mohammed Shadman</h3>
+                                        <p style="font-size: 13px; color:#64748B;" id="rep-meta-desc">Age: 10 • Gender: Boy</p>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <div style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase;">Growth Index Status</div>
+                                        <span id="rep-status-badge" style="display: inline-block; padding: 4px 12px; border-radius: 4px; font-weight: 700; font-size: 12px; margin-top: 5px; color:#FFFFFF; background-color:#1D9E75;">NORMAL (ಸಾಮಾನ್ಯ)</span>
+                                    </div>
+                                </div>
+
+                                <!-- BMI Value bubble and slider -->
+                                <div style="background-color: var(--light-bg); border-radius: 12px; padding: 20px; text-align: center; border: 1px solid var(--border);">
+                                    <div style="font-size: 13px; font-weight: 700; color: #64748B;">Calculated Body Mass Index (BMI)</div>
+                                    <div style="font-size: 40px; font-weight: 800; color: var(--primary); font-family: 'Outfit'; margin: 2px 0;" id="rep-bmi-val">16.5</div>
+                                    <p style="font-size: 12px; color: #475569; max-width: 500px; margin: 0 auto 15px auto;" id="rep-status-advice">
+                                        The child has healthy growth parameters. Maintain a balanced diet using fresh vegetables, pulses, and locally grown millets.
+                                    </p>
+
+                                    <!-- visual gauge slide bar -->
+                                    <div style="height: 10px; border-radius: 5px; background: linear-gradient(90deg, #F59E0B 0%, #10B981 35%, #FBBF24 70%, #EF4444 100%); position: relative; margin-top: 20px; width: 100%;">
+                                        <!-- pointer -->
+                                        <div id="rep-bmi-pointer" style="width: 16px; height: 16px; border-radius: 50%; background-color: #121F1B; border: 3px solid #FFFFFF; position: absolute; top: -3px; left: 45%; transition: left 0.5s ease;"></div>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 9px; color:#64748B; font-weight:700; margin-top: 8px;">
+                                        <span>Underweight (<18.5)</span>
+                                        <span>Normal (18.5-24.9)</span>
+                                        <span>Overweight (25-29.9)</span>
+                                        <span>Obese (>=30)</span>
+                                    </div>
+                                </div>
+
+                                <!-- Dynamic portion suggestion details -->
+                                <div style="background-color: var(--accent-light); border-radius: 8px; padding: 12px; border-left: 5px solid var(--accent); font-size: 12px;">
+                                    <strong>Portion Plan Recommendation / ಶಿಫಾರಸು ಪೌಷ್ಟಿಕಾಂಶ ಭಾಗ:</strong>
+                                    <p style="margin-top: 4px; color:#334155;" id="rep-portion-advice">
+                                        Standard balanced portions (100% capacity) optimized for higher primary child growth indices.
+                                    </p>
+                                </div>
+
+                                <!-- Interactive BMI custom optimization selector -->
+                                <div style="background-color: #E2ECE9; border-radius: 8px; padding: 15px; border: 1.5px solid var(--primary); display: flex; flex-direction: column; gap: 6px;">
+                                    <label for="bmi_optimization_focus" style="display: block; font-weight: 700; font-size: 13px; color: var(--primary-dark);">
+                                        AI Meal Customization Strategy / ಆಹಾರ ಯೋಜನೆ ಆದ್ಯತೆ:
+                                    </label>
+                                    <p style="font-size:11px; color:#475569; margin-bottom: 2px;">Customize meal balancing filters specifically matching the child's assessed metabolic growth rates.</p>
+                                    <select id="bmi_optimization_focus" class="form-control" style="font-size: 13px; padding: 8px 12px; border-color:var(--primary); font-weight:600; color:var(--dark);">
+                                        <option value="standard" selected>Standard Portion Scaling (ಸಮತೋಲಿತ ಆಹಾರ)</option>
+                                        <option value="high_protein">High-Protein & Growth Booster (ಅಧಿಕ ಪ್ರೋಟೀನ್)</option>
+                                        <option value="calcium_iron">Calcium & Iron Rich (ಮೂಳೆ ಬಲವರ್ಧನೆ)</option>
+                                        <option value="low_calorie">Low-Calorie & High-Fiber (ತೂಕ ನಿರ್ವಹಣೆ)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- CTA to planner -->
+                            <div style="display: flex; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 15px; margin-top: 15px;">
+                                <button class="btn-primary" onclick="app.applyBMIToPlan()" style="width: 100%; justify-content: center;">
+                                    Generate Customized Meal Plan / ಆಹಾರ ಪಟ್ಟಿ ರಚಿಸಿ ⚡
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. GENERATOR & LIVE PREVIEW PAGE -->
+        <section id="generator-section" class="app-section">
+            <div class="generator-section">
+                <div class="section-title-wrapper">
+                    <span class="section-tag">Dynamic Rule-Engine</span>
+                    <h2 class="section-title">AI Weekly Meal Plan Generator</h2>
+                </div>
+                
+                <div class="generator-layout">
+                    <!-- Form Control Sidebar -->
+                    <div class="form-panel">
+                        <form id="generator-form" onsubmit="app.submitForm(event)">
+                            <div class="form-group">
+                                <label for="school_name">School Name / ಶಾಲೆಯ ಹೆಸರು</label>
+                                <input type="text" id="school_name" class="form-control" placeholder="e.g. Govt Higher Primary School" required>
+                                <span class="form-error" id="err-school">Please enter the school name</span>
+                            </div>
+
+                            <!-- Optional personalization fields -->
+                            <div class="form-group">
+                                <label for="student_name">Student Name (Optional) / ಮಗುವಿನ ಹೆಸರು (ಐಚ್ಛಿಕ)</label>
+                                <input type="text" id="student_name" class="form-control" placeholder="e.g. Master Shadman">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="teacher_name">Class Teacher Name / ವರ್ಗ ಶಿಕ್ಷಕರ ಹೆಸರು</label>
+                                <input type="text" id="teacher_name" class="form-control" placeholder="e.g. Smt. Savitha" required>
+                                <span class="form-error" id="err-teacher">Please enter the teacher's name</span>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="age_group">Age Group / ವಯೋಮಾನ</label>
+                                <select id="age_group" class="form-control">
+                                    <option value="5-8">5 – 8 Years (Lower Primary)</option>
+                                    <option value="9-12" selected>9 – 12 Years (Higher Primary)</option>
+                                    <option value="13-15">13 – 15 Years (High School)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="preference">Diet Preference / ಆಹಾರ ಪದ್ಧತಿ</label>
+                                <select id="preference" class="form-control">
+                                    <option value="Vegetarian" selected>Vegetarian (ಸಸ್ಯಾಹಾರಿ)</option>
+                                    <option value="Eggetarian">Eggetarian (ಮೊಟ್ಟೆ ಆಹಾರ)</option>
+                                    <option value="Non-vegetarian">Non-vegetarian (ಮಾಂಸಾಹಾರಿ)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="region">District/Region / ಜಿಲ್ಲೆ/ಪ್ರದೇಶ</label>
+                                <select id="region" class="form-control">
+                                    <option value="Mangalore" selected>Mangalore / Dakshina Kannada</option>
+                                    <option value="Udupi">Udupi</option>
+                                    <option value="Shivamogga">Shivamogga (Malnad)</option>
+                                    <option value="Bengaluru Rural">Bengaluru Rural</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="month">Academic Month / ಶೈಕ್ಷಣಿಕ ತಿಂಗಳು</label>
+                                <select id="month" class="form-control">
+                                    <option value="June" selected>June / ಜೂನ್</option>
+                                    <option value="July">July / ಜುಲೈ</option>
+                                    <option value="August">August / ಆಗಸ್ಟ್</option>
+                                    <option value="September">September / ಸೆಪ್ಟೆಂಬರ್</option>
+                                    <option value="October">October / ಅಕ್ಟೋಬರ್</option>
+                                    <option value="November">November / ನವೆಂಬರ್</option>
+                                    <option value="December">December / ಡಿಸೆಂಬರ್</option>
+                                </select>
+                            </div>
+
+                            <!-- Custom AI optimization focus -->
+                            <div class="form-group">
+                                <label for="optimization_strategy">AI Customization Strategy / ಆಹಾರ ಆದ್ಯತೆ</label>
+                                <select id="optimization_strategy" class="form-control">
+                                    <option value="standard" selected>Standard Balanced Scaling (ಸಮತೋಲಿತ ಆಹಾರ)</option>
+                                    <option value="high_protein">High-Protein & Growth Booster (ಅಧಿಕ ಪ್ರೋಟೀನ್)</option>
+                                    <option value="calcium_iron">Calcium & Iron Rich (ಮೂಳೆ ಬಲವರ್ಧನೆ)</option>
+                                    <option value="low_calorie">Calorie-Control & High-Fiber (ಕಡಿಮೆ ಕ್ಯಾಲೋರಿ)</option>
+                                </select>
+                            </div>
+
+                            <!-- Hidden fields passed from BMI calculator -->
+                            <input type="hidden" id="bmi_status_hidden" value="Normal">
+                            
+                            <button type="submit" class="btn-primary btn-generate">
+                                Generate Poster / ರಚಿಸಿ 
+                                <span style="font-size: 16px;">⚡</span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Interactive Live Preview Area -->
+                    <div class="preview-panel" id="preview-panel" style="position: relative;">
+                        <!-- Loading spinner state -->
+                        <div class="loading-overlay" id="gen-loading">
+                            <div class="loading-spinner"></div>
+                            <p>AI Engine Balancing Nutrients...<br>ಕರ್ನಾಟಕ ಸ್ಥಳೀಯ ಆಹಾರ ಪಟ್ಟಿಯನ್ನು ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ...</p>
+                        </div>
+                        
+                        <!-- Empty initial state -->
+                        <div class="empty-state" id="gen-empty">
+                            <div class="empty-state-icon">📋</div>
+                            <h3>No Poster Generated Yet</h3>
+                            <p>Fill out the school parameters on the left and click "Generate Poster" to launch the rule engine.</p>
+                        </div>
+
+                        <!-- Full Poster Presentation and Controls -->
+                        <div id="gen-success" style="display: none; flex-direction: column; height: 100%;">
+                            <div class="preview-header">
+                                <div class="preview-title">
+                                    <span class="status-dot active"></span> Live A4 Poster Preview (A4 ಸ್ಕ್ರಾಲ್ ಪ್ರಿವ್ಯೂ)
+                                </div>
+                                <span style="font-size: 11px; font-weight: 700; color: #475569;">Scrollable / ಸ್ಕ್ರಾಲ್ ಮಾಡಿ</span>
+                            </div>
+
+                            <!-- Scrollable Poster frame -->
+                            <div class="poster-container-scroll">
+                                <!-- Actual A4 Canvas -->
+                                <div class="a4-poster" id="printable-poster">
+                                    <!-- A4 HEADER -->
+                                    <div class="poster-header">
+                                        <div class="poster-header-left">
+                                            <svg class="govt-emblem-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="height: 50px;">
+                                                <circle cx="50" cy="50" r="46" fill="#1D9E75" stroke="#E08E0B" stroke-width="3"/>
+                                                <path d="M50 20 L58 35 L52 35 L56 50 L44 50 L48 35 L42 35 Z" fill="#E08E0B"/>
+                                                <path d="M38 52 C38 48 42 45 50 45 C58 45 62 48 62 52 L62 70 C62 74 58 76 50 76 C42 76 38 74 38 70 Z" fill="#FFFFFF"/>
+                                                <circle cx="50" cy="72" r="3" fill="#E08E0B"/>
+                                            </svg>
+                                            <div>
+                                                <h3 style="font-size: 16px; color: var(--primary-dark); font-weight:800; font-family:'Outfit';">ರಾಷ್ಟ್ರೀಯ ಆರೋಗ್ಯ ಅಭಿಯಾನ ಕರ್ನಾಟಕ</h3>
+                                                <p style="font-size: 9px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing:0.5px;">National Health Mission (NHM), Govt of Karnataka</p>
+                                            </div>
+                                        </div>
+                                        <div class="poster-school-meta">
+                                            <h4 id="post-school-title">Govt School Mangalore</h4>
+                                            <p>Class Teacher: <span id="post-teacher-val">Smt. Savitha</span></p>
+                                            <p>Month: <span id="post-month-val">June 2026</span></p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Personalized child info if available -->
+                                    <div class="poster-student-badge" id="post-student-badge" style="display: none; justify-content: space-between; align-items: center; background-color: var(--primary-light); padding: 8px 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid var(--primary);">
+                                        <div style="font-size: 11px; font-weight:700; color:var(--primary-dark);">
+                                            ಆರೋಗ್ಯವಂತ ಮಗು / Healthy Child: <span id="post-student-name-val">-</span>
+                                        </div>
+                                        <div style="font-size: 10px; font-weight:700; color:var(--accent);" id="post-student-bmi-val">
+                                            Growth Status: Normal
+                                        </div>
+                                    </div>
+
+                                    <!-- TITLE -->
+                                    <div class="poster-title-block">
+                                        <h2>ಈ ವಾರದ ಆರೋಗ್ಯಕರ ಊಟದ ಯೋಜನೆ</h2>
+                                        <h3>Weekly Healthy Nutrient-Balanced Meal Plan</h3>
+                                        <p style="font-size: 9px; font-weight:700; color: var(--primary); margin-top: 5px;" id="post-portion-label">
+                                            Portions: Standard balanced portions for higher primary school growth.
+                                        </p>
+                                    </div>
+
+                                    <!-- GRID Mon-Sat -->
+                                    <div class="poster-grid" id="poster-grid-canvas">
+                                        <!-- Header row -->
+                                        <div class="grid-cell grid-header-cell">
+                                            <span>Meal Slot</span>
+                                            <span class="kn-day">ಊಟದ ಸಮಯ</span>
+                                        </div>
+                                        <div class="grid-cell grid-header-cell">
+                                            <span>Mon</span>
+                                            <span class="kn-day">ಸೋಮವಾರ</span>
+                                        </div>
+                                        <div class="grid-cell grid-header-cell">
+                                            <span>Tue</span>
+                                            <span class="kn-day">ಮಂಗಳವಾರ</span>
+                                        </div>
+                                        <div class="grid-cell grid-header-cell">
+                                            <span>Wed</span>
+                                            <span class="kn-day">ಬುಧವಾರ</span>
+                                        </div>
+                                        <div class="grid-cell grid-header-cell">
+                                            <span>Thu</span>
+                                            <span class="kn-day">ಗುರುವಾರ</span>
+                                        </div>
+                                        <div class="grid-cell grid-header-cell">
+                                            <span>Fri</span>
+                                            <span class="kn-day">ಶುಕ್ರವಾರ</span>
+                                        </div>
+                                        <div class="grid-cell grid-header-cell">
+                                            <span>Sat</span>
+                                            <span class="kn-day">ಶನಿವಾರ</span>
+                                        </div>
+
+                                        <!-- Rows generated dynamically via JS (Breakfast, Lunch, Snack, Dinner) -->
+                                    </div>
+
+                                    <!-- A4 FOOTER -->
+                                    <div class="poster-footer">
+                                        <div class="poster-guidelines">
+                                            <strong>ಮಾರ್ಗದರ್ಶನ / Daily Health Guidelines:</strong>
+                                            <ul style="margin-left: 15px; margin-top: 4px; font-size: 8px;">
+                                                <li>Ensure child drinks 2 liters of pure filtered water daily.</li>
+                                                <li>Hang this chart on your kitchen wall and follow the daily nutritious suggestions.</li>
+                                                <li>Avoid commercial bakery items, high-sodium chips, and color-adulterated sweets.</li>
+                                            </ul>
+                                        </div>
+                                        <div class="poster-disclaimer">
+                                            <p>AI Engine Optimized & Verified under <strong>SDG 2 & 3</strong></p>
+                                            <p style="margin-top: 3px;">NutriPrint Project Portal • <span>Dayananda Sagar College</span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Bottom Action Drawer -->
+                            <div class="poster-actions-bar">
+                                <button class="btn-secondary" onclick="app.regeneratePlan()">Regenerate / ಮರು-ರಚಿಸಿ</button>
+                                <button class="btn-primary" onclick="window.print()">
+                                    Print A4 Poster / ಮುದ್ರಿಸಿ 🖨️
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. NUTRITION LIBRARY PAGE VIEW -->
+        <section id="library-section" class="app-section">
+            <div class="library-section">
+                <div class="section-title-wrapper">
+                    <span class="section-tag">Full Food Catalog</span>
+                    <h2 class="section-title">Karnataka School Nutrition Library</h2>
+                </div>
+
+                <!-- Filters & Search -->
+                <div class="library-controls">
+                    <div class="search-wrapper">
+                        <input type="text" id="lib-search" class="search-input" placeholder="Search local foods (e.g. Ragi, Jowar, Khichdi...)" oninput="app.filterLibrary()">
+                        <svg class="search-icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <select id="lib-filter-cat" class="filter-select" onchange="app.filterLibrary()">
+                            <option value="">All Categories (ಎಲ್ಲಾ ಆಹಾರಗಳು)</option>
+                            <option value="breakfast">Breakfast Only (ತಿಂಡಿ)</option>
+                            <option value="lunch">Lunch Only (ಮಧ್ಯಾಹ್ನದ ಊಟ)</option>
+                            <option value="snack">Snacks Only (ಸಂಜೆ ತಿಂಡಿ)</option>
+                            <option value="dinner">Dinner Only (ರಾತ್ರಿ ಊಟ)</option>
+                        </select>
+
+                        <select id="lib-filter-veg" class="filter-select" onchange="app.filterLibrary()">
+                            <option value="all">All Preferences</option>
+                            <option value="veg">Pure Vegetarian (ಸಸ್ಯಾಹಾರಿ)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Dynamic Library Cards Grid -->
+                <div class="library-grid" id="library-cards-canvas">
+                    <!-- Seeding mock cards, will be managed and overwritten by app.js connection -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. ABOUT & TEAM PAGE VIEW -->
+        <section id="about-section" class="app-section">
+            <div class="about-section">
+                
+                <div class="about-intro-grid">
+                    <div class="about-intro-text">
+                        <span class="section-tag">Academic Milestone</span>
+                        <h2>Project NutriPrint</h2>
+                        <p>
+                            Parents in rural and semi-urban Karnataka lack systematic, easily accessible awareness about balanced child nutrition. They are busy with daily livelihood struggles and rarely search online for nutrition guidelines.
+                        </p>
+                        <p>
+                            <strong>NutriPrint solves this elegantly.</strong> By routing customized dietary printouts through school teachers, the advice is physically printed and reaches the kitchen wall. Every single morning, parents see a structured, budget-friendly meal suggestion using locally available grains like Ragi and Jowar. Awareness is achieved passively, requiring zero technology adoption from the parents.
+                        </p>
+                    </div>
+
+                    <!-- SDG Alignment Badges -->
+                    <div class="about-visual-box">
+                        <h3>United Nations SDG Alignment</h3>
+                        <p style="margin-bottom: 20px; font-weight: 500;">This project is directly designed and mapped to address three critical UN Sustainable Development Goals:</p>
+                        <div class="sdg-goals-panel">
+                            <div class="sdg-badge sdg-2">
+                                <h4>SDG 2</h4>
+                                <p>Zero Hunger / ಹಸಿವು ಮುಕ್ತ</p>
+                            </div>
+                            <div class="sdg-badge sdg-3">
+                                <h4>SDG 3</h4>
+                                <p>Good Health / ಉತ್ತಮ ಆರೋಗ್ಯ</p>
+                            </div>
+                            <div class="sdg-badge sdg-4">
+                                <h4>SDG 4</h4>
+                                <p>Quality Ed / ಉತ್ತಮ ಶಿಕ್ಷಣ</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Team Section -->
+                <div class="team-container">
+                    <div class="section-title-wrapper">
+                        <span class="section-tag">System Architects</span>
+                        <h2 class="section-title">The Engineering Team</h2>
+                    </div>
+
+                    <div class="team-grid">
+                        <!-- Mohammed Shadman -->
+                        <div class="team-card">
+                            <div class="team-avatar">MS</div>
+                            <h4>Mohammed Shadman</h4>
+                            <div class="team-usn">4DM24IS018</div>
+                            <p class="team-details">Department of <span>ISE</span><br>Project Leader & System Architecture</p>
+                        </div>
+                        
+                        <!-- Prakruthi P Shetty -->
+                        <div class="team-card">
+                            <div class="team-avatar">PS</div>
+                            <h4>Prakruthi P Shetty</h4>
+                            <div class="team-usn">4DM25IS012</div>
+                            <p class="team-details">Department of <span>ISE</span><br>Nutrition Database & Data Management</p>
+                        </div>
+
+                        <!-- Prasad N Shenoy -->
+                        <div class="team-card">
+                            <div class="team-avatar">PN</div>
+                            <h4>Prasad N Shenoy</h4>
+                            <div class="team-usn">4DM25AI043</div>
+                            <p class="team-details">Department of <span>AIML</span><br>AI Recommendation Engine</p>
+                        </div>
+
+                        <!-- Shaili -->
+                        <div class="team-card">
+                            <div class="team-avatar">SH</div>
+                            <h4>Shaili</h4>
+                            <div class="team-usn">4DM25CS074</div>
+                            <p class="team-details">Department of <span>CSE</span><br>Frontend Development</p>
+                        </div>
+
+                        <!-- Slinal Xavier DSilva -->
+                        <div class="team-card">
+                            <div class="team-avatar">SX</div>
+                            <h4>Slinal Xavier DSilva</h4>
+                            <div class="team-usn">4DM25AI051</div>
+                            <p class="team-details">Department of <span>AIML</span><br>NLP & Kannada Language Processing</p>
+                        </div>
+
+                        <!-- Swasthi -->
+                        <div class="team-card">
+                            <div class="team-avatar">SW</div>
+                            <h4>Swasthi</h4>
+                            <div class="team-usn">4DM25CS084</div>
+                            <p class="team-details">Department of <span>CSE</span><br>UX Design & Testing</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Course Meta Box -->
+                <div class="course-meta-box">
+                    <p>
+                        Course: <strong>1BPRJ258 — Interdisciplinary Project Work, Semester 2</strong><br>
+                        Institution: <strong>Dayananda Sagar College of Engineering, Bengaluru</strong>
+                    </p>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==========================================
+       OFFICIAL GOVT FOOTER
+       ========================================== -->
+    <footer class="main-footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <h3>NutriPrint — ನ್ಯೂಟ್ರಿಪ್ರಿಂಟ್</h3>
+                <p>
+                    An official academic initiative for digital health intervention. Empowering rural primary schools in Karnataka with rule-based dietary plan structures under the POSHAN Abhiyaan and National Health Mission.
+                </p>
+                <div class="sdg-goals-panel" style="background: transparent; border: none; padding: 0; box-shadow: none; gap: 8px;">
+                    <span style="font-size: 10px; color:#64748B; border: 1px solid #1E2E2A; padding: 4px 8px; border-radius: 4px;">SDG 2: Zero Hunger</span>
+                    <span style="font-size: 10px; color:#64748B; border: 1px solid #1E2E2A; padding: 4px 8px; border-radius: 4px;">SDG 3: Good Health</span>
+                </div>
+            </div>
+            
+            <div class="footer-links">
+                <h4>Quick Navigation</h4>
+                <ul>
+                    <li><a onclick="app.navigateTo('home')">Home / ಮುಖಪುಟ</a></li>
+                    <li><a onclick="app.navigateTo('bmi')">BMI Tracker / ಬಿಎಮ್ಐ ಟ್ರ್ಯಾಕರ್</a></li>
+                    <li><a onclick="app.navigateTo('generator')">AI Meal Planner / ಆಹಾರ ನಿಯೋಜಕ</a></li>
+                    <li><a onclick="app.navigateTo('library')">Nutrition Catalog / ಪೌಷ್ಟಿಕಾಂಶ ಮಾಹಿತಿ</a></li>
+                    <li><a onclick="app.navigateTo('about')">The Project Team / ನಮ್ಮ ಬಗ್ಗೆ</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-contact">
+                <h4>Institutional Meta</h4>
+                <p style="margin-bottom: 8px;"><strong>Dayananda Sagar College of Engineering</strong></p>
+                <p style="color: #64748B; font-size: 12px;">Shavige Malleshwara Hills, Kumaraswamy Layout, Bengaluru, Karnataka 560078</p>
+                <p style="margin-top: 15px; font-size: 12px;">Course Reference: 1BPRJ258</p>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <div class="footer-disclaimer-text">
+                <strong>Disclaimer:</strong> This application is a high-fidelity academic interdisciplinary project submission for evaluation. The meal recommendation guidelines are drawn from standardized Indian nutrition indices (ICMR) and are subject to localized crop supplies.
+            </div>
+            <div>
+                © 2026 NutriPrint Team. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <!-- App Logic Script -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

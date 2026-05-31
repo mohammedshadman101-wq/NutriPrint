@@ -1,0 +1,160 @@
+/* 
+   NutriPrint - A4 Printable Poster Stylesheet
+   Ensures pixel-perfect physical outputs on page print
+*/
+
+@media print {
+    /* Hide all non-printable components */
+    header,
+    footer,
+    .govt-bar,
+    .main-header,
+    .main-footer,
+    .generator-layout .form-panel,
+    .preview-header,
+    .poster-actions-bar,
+    .app-section:not(.active),
+    button,
+    #nav-trigger,
+    .hamburger-btn {
+        display: none !important;
+    }
+
+    /* Force absolute printing layout rules */
+    html, body {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 210mm;
+        height: 297mm;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    /* Target the poster wrapper */
+    .generator-layout {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .preview-panel {
+        border: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .poster-container-scroll {
+        overflow: visible !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        display: block !important;
+    }
+
+    .a4-poster {
+        width: 210mm !important;
+        height: 297mm !important;
+        padding: 15mm !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        page-break-after: avoid;
+        page-break-before: avoid;
+        box-sizing: border-box;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        background-color: #FFFFFF !important;
+    }
+
+    /* Adjust sizing for typography inside printed poster */
+    .poster-header {
+        border-bottom: 2px solid #1D9E75 !important;
+        padding-bottom: 10px !important;
+        margin-bottom: 15px !important;
+    }
+
+    .govt-emblem-svg {
+        height: 50px !important;
+    }
+
+    .poster-school-meta h4 {
+        font-size: 14px !important;
+        color: #146F52 !important;
+    }
+
+    .poster-title-block {
+        margin-bottom: 15px !important;
+    }
+
+    .poster-title-block h2 {
+        font-size: 18px !important;
+    }
+
+    .poster-title-block h3 {
+        font-size: 14px !important;
+    }
+
+    /* Grid Layout Tuning for Print */
+    .poster-grid {
+        margin-bottom: 15px !important;
+        border-top: 1px solid #CBD5E1 !important;
+        border-left: 1px solid #CBD5E1 !important;
+    }
+
+    .grid-cell {
+        border-bottom: 1px solid #CBD5E1 !important;
+        border-right: 1px solid #CBD5E1 !important;
+        padding: 6px !important;
+        page-break-inside: avoid;
+    }
+
+    .grid-header-cell {
+        background-color: #146F52 !important;
+        color: #FFFFFF !important;
+        padding: 8px 4px !important;
+    }
+
+    .grid-day-label-cell {
+        background-color: #E8F6F1 !important;
+        color: #146F52 !important;
+    }
+
+    .meal-block {
+        border-top-width: 3px !important;
+    }
+
+    .meal-name-en {
+        font-size: 9px !important;
+    }
+
+    .meal-name-kn {
+        font-size: 8px !important;
+    }
+
+    .meal-benefit {
+        font-size: 7px !important;
+        padding: 1px 3px !important;
+        background-color: #ECFDF5 !important;
+        border: 1px solid #D1FAE5 !important;
+    }
+
+    /* Footer area adjustments */
+    .poster-footer {
+        border-top: 1px solid #CBD5E1 !important;
+        padding-top: 10px !important;
+    }
+
+    .poster-guidelines {
+        font-size: 8px !important;
+        max-width: 450px !important;
+    }
+
+    .poster-disclaimer {
+        font-size: 7px !important;
+    }
+}
