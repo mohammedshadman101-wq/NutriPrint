@@ -109,20 +109,58 @@
         <section id="home-section" class="app-section active">
             <!-- Hero Banner -->
             <div class="hero-banner">
-                <div class="hero-badge">
-                    <span></span> Academic Interdisciplinary Project Prototype
+                <div class="hero-illustration" aria-hidden="true">
+                    <svg class="hero-bg-svg" viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+                        <circle cx="680" cy="80" r="180" fill="#1D9E75" opacity="0.06"/>
+                        <circle cx="720" cy="340" r="120" fill="#E08E0B" opacity="0.07"/>
+                        <circle cx="100" cy="380" r="140" fill="#1D9E75" opacity="0.05"/>
+                        <path d="M60 200 Q200 120 340 200 T620 200" stroke="#1D9E75" stroke-width="1.5" fill="none" opacity="0.12"/>
+                        <path d="M60 240 Q200 160 340 240 T620 240" stroke="#1D9E75" stroke-width="1" fill="none" opacity="0.08"/>
+                        <circle cx="560" cy="130" r="6" fill="#E08E0B" opacity="0.35"/>
+                        <circle cx="620" cy="260" r="4" fill="#1D9E75" opacity="0.3"/>
+                        <circle cx="160" cy="140" r="5" fill="#E08E0B" opacity="0.25"/>
+                    </svg>
                 </div>
-                <h2>Promoting Healthy Eating Awareness Among Children <br>Through <span>School-to-Kitchen</span> Action</h2>
-                <p class="hero-subtitle">
-                    A novel interdisciplinary platform enabling school teachers to instantly generate, customize, and print 
-                    nutrient-balanced A4 meal plan posters. Empowering parents at home without extra effort.
-                </p>
-                <div class="hero-ctas">
-                    <button class="btn-primary" onclick="app.navigateTo('bmi')">
-                        Assess Student BMI / ಆರೋಗ್ಯ ತಪಾಸಣೆ
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                    </button>
-                    <button class="btn-secondary" onclick="app.navigateTo('generator')">Generate Meal Plan</button>
+
+                <div class="hero-content">
+                    <div class="hero-badge">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        Academic Interdisciplinary Project · Yenepoya Institute of Technology
+                    </div>
+
+                    <h2>Nourishing Karnataka's<br>Children, <span>One Meal Plan</span><br>at a Time</h2>
+
+                    <p class="hero-subtitle">
+                        NutriPrint helps school teachers instantly generate nutrient-balanced, locally-sourced weekly meal plans — printed and sent home to guide parents every single day.
+                    </p>
+
+                    <div class="hero-ctas">
+                        <button class="btn-primary" onclick="app.navigateTo('bmi')">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                            Assess Student BMI
+                        </button>
+                        <button class="btn-secondary" onclick="app.navigateTo('generator')">
+                            Generate Meal Plan
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+
+                    <div class="hero-trust-row">
+                        <div class="hero-trust-item">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            ICMR Nutrition Guidelines
+                        </div>
+                        <span class="hero-trust-divider"></span>
+                        <div class="hero-trust-item">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Local Karnataka Foods
+                        </div>
+                        <span class="hero-trust-divider"></span>
+                        <div class="hero-trust-item">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Under ₹50 per Meal
+                        </div>
+                    </div>
                 </div>
             </div>
 
