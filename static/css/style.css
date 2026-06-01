@@ -492,101 +492,148 @@ a {
 /* Section Title Stylings */
 .section-title-wrapper {
     text-align: center;
-    margin-bottom: 45px;
+    margin-bottom: 48px;
     padding: 0 4%;
 }
 
 .section-tag {
-    color: var(--primary);
-    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    background-color: #E8F6F1;
+    color: var(--primary-dark);
+    font-size: 11.5px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 2px;
-    margin-bottom: 10px;
-    display: block;
+    letter-spacing: 1.2px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1px solid #A8DECE;
+    margin-bottom: 14px;
 }
 
 .section-title {
     font-size: 32px;
     color: var(--dark);
-    position: relative;
-    display: inline-block;
-    padding-bottom: 12px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    display: block;
+    padding-bottom: 0;
 }
 
 .section-title::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60px;
-    height: 4px;
-    background-color: var(--accent);
-    border-radius: 2px;
+    display: none;
+}
+
+.section-subtitle {
+    font-size: 15px;
+    color: #64748B;
+    margin-top: 10px;
+    font-weight: 400;
 }
 
 /* How It Works */
 .how-it-works-section {
-    padding: 60px 4%;
-    background-color: var(--white);
+    padding: 72px 4%;
+    background-color: #F8FBF9;
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
 }
 
 .steps-grid {
-    max-width: 1200px;
+    max-width: 1100px;
     margin: 0 auto;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 40px;
+    grid-template-columns: 1fr auto 1fr auto 1fr;
+    gap: 0;
+    align-items: start;
+}
+
+.step-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 52px;
 }
 
 .step-card {
-    text-align: center;
+    background-color: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 24px;
+    text-align: left;
     position: relative;
+    transition: var(--transition);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.step-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 28px rgba(29, 158, 117, 0.1);
+    border-color: #A8DECE;
+}
+
+.step-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+
+.step-number-badge {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--primary);
+    font-family: 'Outfit', sans-serif;
+    background-color: var(--primary-light);
+    padding: 4px 10px;
+    border-radius: 6px;
+    letter-spacing: 0.5px;
 }
 
 .step-icon-box {
-    width: 80px;
-    height: 80px;
+    width: 48px;
+    height: 48px;
     background-color: var(--primary-light);
-    border-radius: 50%;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 20px auto;
-    font-size: 28px;
     color: var(--primary);
-    border: 2px dashed var(--primary);
-    position: relative;
-}
-
-.step-number {
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    background-color: var(--accent);
-    color: var(--white);
-    font-weight: 700;
-    font-size: 12px;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    border: none;
 }
 
 .step-card h3 {
-    font-size: 18px;
+    font-size: 17px;
+    font-weight: 700;
     margin-bottom: 10px;
     color: var(--dark);
+    letter-spacing: -0.1px;
 }
 
 .step-card p {
-    font-size: 14px;
+    font-size: 13.5px;
     color: #64748B;
+    line-height: 1.65;
+    margin-bottom: 20px;
+}
+
+.step-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--primary);
+    cursor: pointer;
+    transition: var(--transition);
+    padding: 0;
+    border: none;
+    background: none;
+}
+
+.step-action:hover {
+    color: var(--primary-dark);
+    gap: 9px;
 }
 
 /* Showcase Grid */
