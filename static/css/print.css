@@ -37,4 +37,9 @@
         box-sizing: border-box !important;
         background: white !important;
     }
+
+    .a4-poster {
+    height: 297mm !important;
+    overflow: hidden !important;
+    }
 }
