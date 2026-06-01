@@ -67,7 +67,7 @@ a {
 /* ==========================================
    OFFICIAL GOVT HEADER
    ========================================== */
-.govt-bar {
+.School-bar {
     background: linear-gradient(90deg, #12553E 0%, #1D9E75 100%);
     color: var(--white);
     padding: 6px 4%;
@@ -80,7 +80,7 @@ a {
     letter-spacing: 0.5px;
 }
 
-.govt-bar .left-links, .govt-bar .right-links {
+.School-bar .left-links, .School-bar .right-links {
     display: flex;
     gap: 15px;
     align-items: center;
@@ -110,7 +110,7 @@ a {
     gap: 15px;
 }
 
-.govt-emblem-svg {
+.School-emblem-svg {
     height: 60px;
     width: auto;
 }
