@@ -412,54 +412,81 @@ a {
 /* Statistics Counters Section */
 .stats-section {
     max-width: 1200px;
-    margin: -60px auto 60px auto;
-    padding: 0 4%;
-    position: relative;
-    z-index: 10;
+    margin: 0 auto;
+    padding: 0 4% 64px 4%;
 }
 
 .stats-grid {
-    background-color: var(--white);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-lg);
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    padding: 30px;
-    border-bottom: 4px solid var(--primary);
     gap: 20px;
 }
 
 .stat-card {
-    text-align: center;
-    padding: 15px;
-    border-right: 1px solid var(--border);
+    background-color: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px 22px 22px;
+    position: relative;
+    overflow: hidden;
+    transition: var(--transition);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 
-.stat-card:last-child {
-    border-right: none;
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    border-radius: 14px 14px 0 0;
+}
+
+.stat-card--red::before   { background-color: #EF4444; }
+.stat-card--orange::before { background-color: var(--accent); }
+.stat-card--yellow::before { background-color: #F59E0B; }
+.stat-card--green::before  { background-color: var(--primary); }
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    border-color: #CBD5E1;
+}
+
+.stat-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #94A3B8;
+    margin-bottom: 10px;
 }
 
 .stat-number {
-    font-size: 38px;
+    font-size: 42px;
     font-family: 'Outfit', sans-serif;
     font-weight: 800;
-    color: var(--primary);
-    margin-bottom: 5px;
+    color: var(--dark);
+    margin-bottom: 8px;
     display: flex;
-    justify-content: center;
     align-items: baseline;
+    gap: 2px;
+    line-height: 1;
 }
 
-.stat-number span {
-    font-size: 24px;
-    color: var(--accent);
+.stat-unit {
+    font-size: 20px;
+    font-weight: 700;
+    color: #94A3B8;
 }
 
 .stat-card p {
     font-size: 13px;
-    color: #475569;
-    font-weight: 600;
-    line-height: 1.4;
+    color: #64748B;
+    font-weight: 500;
+    line-height: 1.45;
+    margin: 0;
 }
 
 /* Section Title Stylings */
