@@ -4,6 +4,25 @@
 */
 
 @media print {
+   /* Hide everything */
+body * {
+    visibility: hidden !important;
+}
+
+/* Show only the poster */
+#printable-poster,
+#printable-poster * {
+    visibility: visible !important;
+}
+
+/* Position poster on page */
+#printable-poster {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+}
     /* Hide all non-printable components */
     header,
     footer,
