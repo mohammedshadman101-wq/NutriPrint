@@ -114,7 +114,10 @@ def get_nutrition_library():
         return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
-
+@app.route('/app.js')
+def serve_appjs():
+    return send_from_directory('.', 'app.js')
+    
 if __name__ == '__main__':
     # Running Flask app on local dev server (port 5001 to avoid macOS conflict)
     app.run(host='0.0.0.0', port=5001, debug=True)
