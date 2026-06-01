@@ -31,9 +31,9 @@
 
     .a4-poster {
         width: 210mm !important;
-        min-height: 297mm !important;
+        min-height: 285mm !important;
         margin: 0 auto !important;
-        padding: 10mm !important;
+        padding: 5mm !important;
         box-sizing: border-box !important;
         background: white !important;
     }
