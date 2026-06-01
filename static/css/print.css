@@ -42,4 +42,9 @@
     height: 297mm !important;
     overflow: hidden !important;
     }
+    
+    .school-bar {
+        display: none !important;
+    }
+}
 }
