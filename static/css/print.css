@@ -5,9 +5,11 @@
 
 @media print {
 
+    html,
     body {
         margin: 0 !important;
         padding: 0 !important;
+        background: white !important;
     }
 
     header,
@@ -18,16 +20,21 @@
         display: none !important;
     }
 
-    #printable-poster {
+    .generator-layout,
+    .preview-panel,
+    .poster-container-scroll {
+        display: block !important;
+        overflow: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .a4-poster {
         width: 210mm !important;
         min-height: 297mm !important;
         margin: 0 auto !important;
         padding: 10mm !important;
         box-sizing: border-box !important;
         background: white !important;
-    }
-
-    .poster-grid {
-        width: 100% !important;
     }
 }
