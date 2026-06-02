@@ -4,7 +4,12 @@
 }
 
 @media print {
-
+    .main-header,
+    .project-info-bar,
+    .school-bar {
+        display: none !important;
+    }
+}
     html,
     body {
         margin: 0 !important;
@@ -45,6 +50,9 @@
     
     .school-bar {
         display: none !important;
+
+        .School-bar {
+            display: none !important;
     }
 }
 }
