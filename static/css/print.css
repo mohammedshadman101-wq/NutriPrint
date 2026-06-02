@@ -5,11 +5,18 @@
 
 @media print {
 
+    /* Hide headers and project info */
     .main-header,
     .project-info-bar,
     .school-bar,
     .School-bar,
-    .poster-school-meta {
+    .poster-school-meta,
+    .preview-header,
+    header,
+    footer,
+    .form-panel,
+    .poster-actions-bar,
+    h1 {
         display: none !important;
     }
 
@@ -18,14 +25,6 @@
         margin: 0 !important;
         padding: 0 !important;
         background: white !important;
-    }
-
-    header,
-    footer,
-    .form-panel,
-    .poster-actions-bar,
-    .preview-header {
-        display: none !important;
     }
 
     .generator-layout,
@@ -39,7 +38,7 @@
 
     .a4-poster {
         width: 210mm !important;
-        min-height: 270mm !important;
+        min-height: auto !important;
         height: 285mm !important;
         margin: 0 auto !important;
         padding: 3mm !important;
