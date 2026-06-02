@@ -4,12 +4,15 @@
 }
 
 @media print {
+
     .main-header,
     .project-info-bar,
-    .school-bar {
+    .school-bar,
+    .School-bar,
+    .poster-school-meta {
         display: none !important;
     }
-}
+
     html,
     body {
         margin: 0 !important;
@@ -37,22 +40,11 @@
     .a4-poster {
         width: 210mm !important;
         min-height: 270mm !important;
+        height: 285mm !important;
         margin: 0 auto !important;
         padding: 3mm !important;
         box-sizing: border-box !important;
         background: white !important;
+        overflow: hidden !important;
     }
-
-    .a4-poster {
-    height: 285mm !important;
-    overflow: hidden !important;
-    }
-    
-    .school-bar {
-        display: none !important;
-
-        .School-bar {
-            display: none !important;
-    }
-}
 }
