@@ -5,18 +5,18 @@
 
 @media print {
 
-    /* Hide headers and project info */
+    /* Hide all unwanted headers */
     .main-header,
     .project-info-bar,
     .school-bar,
     .School-bar,
     .poster-school-meta,
+    .section-title-wrapper,
     .preview-header,
     header,
     footer,
     .form-panel,
-    .poster-actions-bar,
-    h1 {
+    .poster-actions-bar {
         display: none !important;
     }
 
