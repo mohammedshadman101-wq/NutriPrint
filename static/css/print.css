@@ -5,18 +5,18 @@
 
 @media print {
 
-    /* Hide unwanted page elements */
+    /* Hide headers and project info */
     .main-header,
     .project-info-bar,
     .school-bar,
     .School-bar,
     .poster-school-meta,
     .section-title-wrapper,
-    .preview-header,
     header,
     footer,
     .form-panel,
-    .poster-actions-bar {
+    .poster-actions-bar,
+    .preview-header {
         display: none !important;
     }
 
@@ -31,7 +31,8 @@
 
     .generator-layout,
     .preview-panel,
-    .poster-container-scroll {
+    .poster-container-scroll,
+    .poster-wrapper {
         display: block !important;
         overflow: visible !important;
         margin: 0 !important;
@@ -40,12 +41,22 @@
     }
 
     .a4-poster {
-        width: 210mm !important;
+        width: 100% !important;
         height: auto !important;
-        margin: 0 auto !important;
-        padding: 1mm !important;
+        min-height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
         box-sizing: border-box !important;
         background: white !important;
-        overflow: visible !important;
+        overflow: hidden !important;
+    }
+
+    /* Remove footer/guidelines section if present */
+    .poster-footer,
+    .poster-guidelines,
+    .daily-guidelines,
+    .footer-note,
+    .footer-section {
+        display: none !important;
     }
 }
