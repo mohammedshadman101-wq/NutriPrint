@@ -5,7 +5,7 @@ import uuid
 import base64
 import sqlite3
 import qrcode
-from google import genai
+from groq import Groq
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -22,8 +22,7 @@ with app.app_context():
     except Exception as e:
         print(f"Error seeding database on startup: {e}")
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
 # ── Static pages ────────────────────────────────────────────────────────────
@@ -312,14 +311,11 @@ def dashboard(teacher_id):
         conn.close()
 
 
-# ── AI Advisor (Gemini) ──────────────────────────────────────────────────────
+# ── AI Advisor (Groq - free tier, no quota issues) ───────────────────────────
 
 @app.route('/api/ai-advisor', methods=['POST'])
 def ai_advisor():
     try:
-        if not gemini_client:
-            return jsonify({"error": "Gemini API key not configured."}), 500
-
         data = request.json or {}
 
         student_name = data.get('student_name', 'Student')
@@ -341,15 +337,16 @@ Question: {question}
 Give a short, practical answer for parents and school teachers.
 Keep it under 120 words."""
 
-        response = gemini_client.models.generate_content(
-            model="gemini-2.0-flash-lite",
-            contents=prompt
+        response = groq_client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=200
         )
 
-        return jsonify({"reply": response.text})
+        return jsonify({"reply": response.choices[0].message.content})
 
     except Exception as e:
-        print("Gemini Error:", str(e))
+        print("Groq Error:", str(e))
         return jsonify({"error": str(e)}), 500
 
 
