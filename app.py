@@ -343,7 +343,7 @@ Give a short, practical answer for parents and school teachers.
 Keep it under 120 words.
 """
 
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash')
         response = model.generate_content(prompt)
 
         return jsonify({"reply": response.text})
