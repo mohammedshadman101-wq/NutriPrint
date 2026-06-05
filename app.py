@@ -1,10 +1,13 @@
 import os
-import sqlite3
+import io
 import json
-import urllib.request
-import urllib.error
+import uuid
+import base64
+import sqlite3
+import qrcode
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+from werkzeug.security import generate_password_hash, check_password_hash
 from database import init_db, get_db_connection
 from meal_generator import generate_weekly_meal_plan
 
@@ -18,26 +21,131 @@ with app.app_context():
     except Exception as e:
         print(f"Error seeding database on startup: {e}")
 
+
+# ── Static pages ────────────────────────────────────────────────────────────
+
 @app.route('/')
 def index():
     return send_from_directory(app.static_folder, 'index.html')
+
+@app.route('/plan/<qr_code>')
+def plan_page(qr_code):
+    """Public page parents open when they scan the QR code."""
+    return send_from_directory(app.static_folder, 'plan.html')
 
 @app.route('/static/<path:path>')
 def serve_static(path):
     return send_from_directory(app.static_folder, path)
 
+@app.route('/app.js')
+def serve_appjs():
+    return send_from_directory('.', 'app.js')
+
+
+# ── Auth: Register ───────────────────────────────────────────────────────────
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    """
+    POST /api/register
+    Body: { name, school_name, district, phone, password }
+    """
+    data = request.json or {}
+    name        = data.get('name', '').strip()
+    school_name = data.get('school_name', '').strip()
+    district    = data.get('district', '').strip()
+    phone       = data.get('phone', '').strip()
+    password    = data.get('password', '').strip()
+
+    if not all([name, school_name, district, phone, password]):
+        return jsonify({"error": "All fields are required."}), 400
+
+    if len(password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters."}), 400
+
+    password_hash = generate_password_hash(password)
+
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            "INSERT INTO teachers (name, school_name, district, phone, password_hash) VALUES (?, ?, ?, ?, ?)",
+            (name, school_name, district, phone, password_hash)
+        )
+        conn.commit()
+        # Fetch the new teacher
+        teacher = conn.execute(
+            "SELECT id, name, school_name, district, phone FROM teachers WHERE phone = ?",
+            (phone,)
+        ).fetchone()
+        return jsonify({
+            "message": "Registration successful!",
+            "teacher": dict(teacher)
+        }), 201
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "Phone number already registered."}), 409
+    finally:
+        conn.close()
+
+
+# ── Auth: Login ──────────────────────────────────────────────────────────────
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    """
+    POST /api/login
+    Body: { phone, password }
+    Returns teacher info if credentials are correct.
+    """
+    data     = request.json or {}
+    phone    = data.get('phone', '').strip()
+    password = data.get('password', '').strip()
+
+    if not phone or not password:
+        return jsonify({"error": "Phone and password are required."}), 400
+
+    conn = get_db_connection()
+    try:
+        teacher = conn.execute(
+            "SELECT * FROM teachers WHERE phone = ?", (phone,)
+        ).fetchone()
+
+        if not teacher or not check_password_hash(teacher['password_hash'], password):
+            return jsonify({"error": "Invalid phone number or password."}), 401
+
+        return jsonify({
+            "message": "Login successful!",
+            "teacher": {
+                "id":          teacher['id'],
+                "name":        teacher['name'],
+                "school_name": teacher['school_name'],
+                "district":    teacher['district'],
+                "phone":       teacher['phone']
+            }
+        })
+    finally:
+        conn.close()
+
+
+# ── Generate Meal Plan ────────────────────────────────────────────────────────
+
 @app.route('/api/generate', methods=['POST'])
 def generate_plan():
+    """
+    POST /api/generate
+    Body: { school_name, teacher_name, age_group, preference, region, month,
+            student_name (opt), bmi_status (opt), optimization_strategy (opt) }
+    """
     data = request.json or {}
-    school_name = data.get('school_name', '').strip()
-    student_name = data.get('student_name', '').strip()
-    bmi_status = data.get('bmi_status', '').strip()
+
+    school_name           = data.get('school_name', '').strip()
+    student_name          = data.get('student_name', '').strip()
+    bmi_status            = data.get('bmi_status', '').strip()
     optimization_strategy = data.get('optimization_strategy', 'standard').strip()
-    teacher_name = data.get('teacher_name', '').strip()
-    age_group = data.get('age_group', '9-12')
-    preference = data.get('preference', 'Vegetarian')
-    region = data.get('region', 'All')
-    month = data.get('month', 'June')
+    teacher_name          = data.get('teacher_name', '').strip()
+    age_group             = data.get('age_group', '9-12')
+    preference            = data.get('preference', 'Vegetarian')
+    region                = data.get('region', 'All')
+    month                 = data.get('month', 'June')
 
     if not school_name:
         return jsonify({"error": "School name is required.", "error_kn": "ಶಾಲೆಯ ಹೆಸರು ಕಡ್ಡಾಯವಾಗಿದೆ."}), 400
@@ -62,24 +170,129 @@ def generate_plan():
         traceback.print_exc()
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 
+
+# ── Save Plan + Generate QR Code ─────────────────────────────────────────────
+
+@app.route('/api/save-plan', methods=['POST'])
+def save_plan():
+    """
+    POST /api/save-plan
+    Body: { teacher_id, plan_data, school_name, teacher_name,
+            student_name (opt), bmi_status (opt), age_group, preference, region, month }
+    Returns: { qr_code, qr_image_base64, plan_url }
+    """
+    data = request.json or {}
+
+    teacher_id   = data.get('teacher_id')
+    plan_data    = data.get('plan_data')
+    school_name  = data.get('school_name', '').strip()
+    teacher_name = data.get('teacher_name', '').strip()
+    student_name = data.get('student_name', '').strip()
+    bmi_status   = data.get('bmi_status', '').strip()
+    age_group    = data.get('age_group', '')
+    preference   = data.get('preference', '')
+    region       = data.get('region', '')
+    month        = data.get('month', '')
+
+    if not plan_data or not school_name or not teacher_name:
+        return jsonify({"error": "Missing required fields."}), 400
+
+    # Generate a unique QR code token
+    qr_token = str(uuid.uuid4()).replace('-', '')[:16]
+
+    # Build the public URL parents will see
+    base_url = request.host_url.rstrip('/')
+    plan_url = f"{base_url}/plan/{qr_token}"
+
+    # Generate QR code image as base64
+    qr_img = qrcode.make(plan_url)
+    buffer = io.BytesIO()
+    qr_img.save(buffer, format='PNG')
+    qr_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            """INSERT INTO saved_plans
+               (qr_code, teacher_id, plan_data, school_name, teacher_name,
+                student_name, bmi_status, age_group, preference, region, month)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (qr_token, teacher_id, json.dumps(plan_data), school_name, teacher_name,
+             student_name, bmi_status, age_group, preference, region, month)
+        )
+        conn.commit()
+        return jsonify({
+            "qr_code":          qr_token,
+            "qr_image_base64":  qr_b64,
+            "plan_url":         plan_url
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ── Public Plan Page (QR scan target) ────────────────────────────────────────
+
+@app.route('/api/plan/<qr_code>', methods=['GET'])
+def get_plan(qr_code):
+    """
+    GET /api/plan/<qr_code>
+    Returns saved meal plan + recipe details for each meal.
+    Called by plan.html when a parent scans the QR code.
+    """
+    conn = get_db_connection()
+    try:
+        row = conn.execute(
+            "SELECT * FROM saved_plans WHERE qr_code = ?", (qr_code,)
+        ).fetchone()
+
+        if not row:
+            return jsonify({"error": "Plan not found."}), 404
+
+        plan_data = json.loads(row['plan_data'])
+
+        return jsonify({
+            "school_name":  row['school_name'],
+            "teacher_name": row['teacher_name'],
+            "student_name": row['student_name'],
+            "bmi_status":   row['bmi_status'],
+            "age_group":    row['age_group'],
+            "preference":   row['preference'],
+            "region":       row['region'],
+            "month":        row['month'],
+            "created_at":   row['created_at'],
+            "plan":         plan_data
+        })
+    finally:
+        conn.close()
+
+
+# ── Nutrition Library ─────────────────────────────────────────────────────────
+
 @app.route('/api/nutrition', methods=['GET'])
 def get_nutrition_library():
     search_query = request.args.get('search', '').strip()
-    category = request.args.get('category', '').strip()
-    veg_only = request.args.get('veg_only', 'false').lower() == 'true'
+    category     = request.args.get('category', '').strip()
+    veg_only     = request.args.get('veg_only', 'false').lower() == 'true'
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    query = "SELECT * FROM foods WHERE 1=1"
+
+    query  = "SELECT * FROM foods WHERE 1=1"
     params = []
 
     if search_query:
         query += " AND (name_en LIKE ? OR name_kn LIKE ? OR recipe_tip_en LIKE ?)"
         like_param = f"%{search_query}%"
         params.extend([like_param, like_param, like_param])
+
     if category:
         query += " AND category = ?"
         params.append(category)
+
     if veg_only:
         query += " AND is_veg = 1"
 
@@ -92,88 +305,6 @@ def get_nutrition_library():
     finally:
         conn.close()
 
-# ─────────────────────────────────────────────
-# NEW: Gemini AI Nutrition Advisor Route
-# ─────────────────────────────────────────────
-@app.route('/api/ai-advisor', methods=['POST'])
-def ai_advisor():
-    """
-    Gemini-powered AI nutrition advisor.
-    Accepts student details and returns personalised nutrition advice.
-    """
-    data = request.json or {}
-    student_name = data.get('student_name', 'the student')
-    age = data.get('age', 10)
-    gender = data.get('gender', 'Boy')
-    bmi_status = data.get('bmi_status', 'Normal')
-    bmi_value = data.get('bmi_value', '')
-    preference = data.get('preference', 'Vegetarian')
-    region = data.get('region', 'Karnataka')
-    question = data.get('question', '').strip()
-
-    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
-
-    if not GEMINI_API_KEY:
-        return jsonify({
-            "reply": "AI Advisor is not configured yet. Please ask the teacher to contact school administration.",
-            "reply_kn": "AI ಸಲಹೆಗಾರ ಅನ್ವಯಿಸಲಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಶಿಕ್ಷಕರನ್ನು ಸಂಪರ್ಕಿಸಿ."
-        }), 200
-
-    # Build context-aware prompt
-    system_prompt = f"""You are NutriPrint AI, a friendly school nutrition advisor for Karnataka, India.
-You help PT teachers and parents understand children's dietary needs based on BMI.
-Always recommend locally available Karnataka foods like Ragi, Jowar, Millets, Coconut Rice, Sambar, Idli, Dosa.
-Keep replies short, practical, and easy for parents to understand.
-Always give serving sizes in simple terms like "1 cup", "2 rotis", "1 bowl".
-Reply in simple English. Keep it under 150 words."""
-
-    user_message = f"""Student: {student_name}, Age: {age}, Gender: {gender}
-BMI Status: {bmi_status} (BMI: {bmi_value})
-Diet Preference: {preference}
-Region: {region}
-
-Question: {question if question else f"What should {student_name} eat this week to improve health? Give a simple 3-day meal suggestion with serving sizes."}"""
-
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": system_prompt + "\n\n" + user_message}
-                    ]
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.7,
-                "maxOutputTokens": 300
-            }
-        }
-
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode('utf-8'),
-            headers={'Content-Type': 'application/json'},
-            method='POST'
-        )
-
-        with urllib.request.urlopen(req, timeout=15) as response:
-            result = json.loads(response.read().decode('utf-8'))
-            reply = result['candidates'][0]['content']['parts'][0]['text']
-            return jsonify({"reply": reply, "reply_kn": ""})
-
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode('utf-8')
-        print(f"Gemini API HTTP Error: {e.code} - {error_body}")
-        return jsonify({"reply": "AI Advisor is temporarily unavailable. Please try again later.", "error": str(e)}), 200
-    except Exception as e:
-        print(f"AI Advisor error: {e}")
-        return jsonify({"reply": "AI Advisor encountered an error. Please try again.", "error": str(e)}), 200
-
-@app.route('/app.js')
-def serve_appjs():
-    return send_from_directory('.', 'app.js')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
-
