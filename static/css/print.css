@@ -60,3 +60,28 @@
         display: none !important;
     }
 }
+@media print {
+
+    #poster-grid-canvas {
+        page-break-before: avoid !important;
+        break-before: avoid !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        margin-top: 10px !important;
+    }
+
+    #poster-qr-container {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    .poster-title-block {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+    }
+
+    .a4-poster * {
+        page-break-inside: avoid !important;
+    }
+}
