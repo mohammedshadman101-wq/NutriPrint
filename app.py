@@ -26,7 +26,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    
+
 # ── Static pages ────────────────────────────────────────────────────────────
 
 @app.route('/')
@@ -35,7 +35,6 @@ def index():
 
 @app.route('/plan/<qr_code>')
 def plan_page(qr_code):
-    """Public page parents open when they scan the QR code."""
     return send_from_directory(app.static_folder, 'plan.html')
 
 @app.route('/static/<path:path>')
@@ -51,10 +50,6 @@ def serve_appjs():
 
 @app.route('/api/register', methods=['POST'])
 def register():
-    """
-    POST /api/register
-    Body: { name, school_name, district, phone, password }
-    """
     data = request.json or {}
     name        = data.get('name', '').strip()
     school_name = data.get('school_name', '').strip()
@@ -77,7 +72,6 @@ def register():
             (name, school_name, district, phone, password_hash)
         )
         conn.commit()
-        # Fetch the new teacher
         teacher = conn.execute(
             "SELECT id, name, school_name, district, phone FROM teachers WHERE phone = ?",
             (phone,)
@@ -96,11 +90,6 @@ def register():
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    """
-    POST /api/login
-    Body: { phone, password }
-    Returns teacher info if credentials are correct.
-    """
     data     = request.json or {}
     phone    = data.get('phone', '').strip()
     password = data.get('password', '').strip()
@@ -135,11 +124,6 @@ def login():
 
 @app.route('/api/generate', methods=['POST'])
 def generate_plan():
-    """
-    POST /api/generate
-    Body: { school_name, teacher_name, age_group, preference, region, month,
-            student_name (opt), bmi_status (opt), optimization_strategy (opt) }
-    """
     data = request.json or {}
 
     school_name           = data.get('school_name', '').strip()
@@ -176,27 +160,17 @@ def generate_plan():
             bmi_status=bmi_status,
             optimization_strategy=optimization_strategy
         )
-
         return jsonify(plan)
-
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({
-            "error": f"Internal Server Error: {str(e)}"
-        }), 500
+        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 
 
 # ── Save Plan + Generate QR Code ─────────────────────────────────────────────
 
 @app.route('/api/save-plan', methods=['POST'])
 def save_plan():
-    """
-    POST /api/save-plan
-    Body: { teacher_id, plan_data, school_name, teacher_name,
-            student_name (opt), bmi_status (opt), age_group, preference, region, month }
-    Returns: { qr_code, qr_image_base64, plan_url }
-    """
     data = request.json or {}
 
     teacher_id   = data.get('teacher_id')
@@ -210,22 +184,13 @@ def save_plan():
     region       = data.get('region', '')
     month        = data.get('month', '')
 
-    print("SAVE PLAN CALLED")
-    print("Teacher ID:", teacher_id)
-    print("School:", school_name)
-    print("Student:", student_name)
-
     if not plan_data or not school_name or not teacher_name:
         return jsonify({"error": "Missing required fields."}), 400
 
-    # Generate a unique QR code token
     qr_token = str(uuid.uuid4()).replace('-', '')[:16]
-
-    # Build the public URL parents will see
     base_url = request.host_url.rstrip('/')
     plan_url = f"{base_url}/plan/{qr_token}"
 
-    # Generate QR code image as base64
     qr_img = qrcode.make(plan_url)
     buffer = io.BytesIO()
     qr_img.save(buffer, format='PNG')
@@ -243,9 +208,9 @@ def save_plan():
         )
         conn.commit()
         return jsonify({
-            "qr_code":          qr_token,
-            "qr_image_base64":  qr_b64,
-            "plan_url":         plan_url
+            "qr_code":         qr_token,
+            "qr_image_base64": qr_b64,
+            "plan_url":        plan_url
         })
     except Exception as e:
         import traceback
@@ -259,11 +224,6 @@ def save_plan():
 
 @app.route('/api/plan/<qr_code>', methods=['GET'])
 def get_plan(qr_code):
-    """
-    GET /api/plan/<qr_code>
-    Returns saved meal plan + recipe details for each meal.
-    Called by plan.html when a parent scans the QR code.
-    """
     conn = get_db_connection()
     try:
         row = conn.execute(
@@ -274,7 +234,6 @@ def get_plan(qr_code):
             return jsonify({"error": "Plan not found."}), 404
 
         plan_data = json.loads(row['plan_data'])
-
         return jsonify({
             "school_name":  row['school_name'],
             "teacher_name": row['teacher_name'],
@@ -325,54 +284,47 @@ def get_nutrition_library():
         return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
-        
+
+
 # ── Teacher Dashboard ───────────────────────────────────────────────────────
 
 @app.route('/api/dashboard/<int:teacher_id>', methods=['GET'])
 def dashboard(teacher_id):
     conn = get_db_connection()
-
     try:
         students = conn.execute(
-            "SELECT * FROM students WHERE teacher_id = ?",
-            (teacher_id,)
+            "SELECT * FROM students WHERE teacher_id = ?", (teacher_id,)
         ).fetchall()
 
         plans = conn.execute(
-            """
-            SELECT
-                student_name,
-                bmi_status,
-                created_at
-            FROM saved_plans
-            WHERE teacher_id = ?
-            ORDER BY created_at DESC
-            """,
+            """SELECT student_name, bmi_status, created_at
+               FROM saved_plans WHERE teacher_id = ?
+               ORDER BY created_at DESC""",
             (teacher_id,)
         ).fetchall()
 
         return jsonify({
             "students": [dict(x) for x in students],
-            "plans": [dict(x) for x in plans]
+            "plans":    [dict(x) for x in plans]
         })
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
     finally:
         conn.close()
 
 
-if __name__ == '__main__':
-    @app.route('/api/ai-advisor', methods=['POST'])
+# ── AI Advisor (Gemini) ──────────────────────────────────────────────────────
+# ✅ FIX: Moved outside if __name__ == '__main__' so Render registers this route
+
+@app.route('/api/ai-advisor', methods=['POST'])
 def ai_advisor():
     try:
         data = request.json or {}
 
         student_name = data.get('student_name', 'Student')
-        bmi_status = data.get('bmi_status', 'Normal')
-        age = data.get('age', '')
-        question = data.get('question', '')
+        bmi_status   = data.get('bmi_status', 'Normal')
+        age          = data.get('age', '')
+        question     = data.get('question', '')
 
         if not question:
             question = "Give healthy eating advice for this student."
@@ -394,13 +346,14 @@ Keep it under 120 words.
         model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content(prompt)
 
-        return jsonify({
-            "reply": response.text
-        })
+        return jsonify({"reply": response.text})
 
     except Exception as e:
         print("Gemini Error:", str(e))
-        return jsonify({
-            "error": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Run ──────────────────────────────────────────────────────────────────────
+
+if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
