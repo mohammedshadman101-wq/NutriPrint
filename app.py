@@ -153,7 +153,7 @@ def generate_plan():
         return jsonify({"error": "Class teacher name is required.", "error_kn": "ತರಗತಿ ಶಿಕ್ಷಕರ ಹೆಸರು ಕಡ್ಡಾಯವಾಗಿದೆ."}), 400
 
     try:
-    plan = generate_weekly_meal_plan(
+        plan = generate_weekly_meal_plan(
         school_name=school_name,
         teacher_name=teacher_name,
         age_group=age_group,
