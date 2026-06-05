@@ -205,6 +205,11 @@ def save_plan():
     region       = data.get('region', '')
     month        = data.get('month', '')
 
+    print("SAVE PLAN CALLED")
+    print("Teacher ID:", teacher_id)
+    print("School:", school_name)
+    print("Student:", student_name)
+
     if not plan_data or not school_name or not teacher_name:
         return jsonify({"error": "Missing required fields."}), 400
 
