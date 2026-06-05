@@ -308,3 +308,30 @@ def get_nutrition_library():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
+    @app.route('/api/dashboard/<int:teacher_id>')
+def dashboard(teacher_id):
+    conn = get_db_connection()
+
+    students = conn.execute(
+        "SELECT * FROM students WHERE teacher_id=?",
+        (teacher_id,)
+    ).fetchall()
+
+    plans = conn.execute(
+        """
+        SELECT student_name,
+               bmi_status,
+               created_at
+        FROM saved_plans
+        WHERE teacher_id=?
+        ORDER BY created_at DESC
+        """,
+        (teacher_id,)
+    ).fetchall()
+
+    conn.close()
+
+    return jsonify({
+        "students": [dict(x) for x in students],
+        "plans": [dict(x) for x in plans]
+    })
