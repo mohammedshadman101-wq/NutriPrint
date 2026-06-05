@@ -229,13 +229,52 @@ const app = {
 
   applyBMIToPlan() {
     if (this.lastBMIData) {
+      // Auto-fill student name
       document.getElementById('student_name').value = this.lastBMIData.name || '';
+      
+      // Auto-fill BMI status
       document.getElementById('bmi_status_hidden').value = this.lastBMIData.status;
+      
+      // Auto-fill optimization strategy from BMI result
       const opt = document.getElementById('bmi_optimization_focus');
       const strategy = document.getElementById('optimization_strategy');
       if (opt && strategy) strategy.value = opt.value;
+
+      // Auto-fill age group based on BMI age
+      const age = this.lastBMIData.age;
+      const ageGroupEl = document.getElementById('age_group');
+      if (ageGroupEl) {
+        if (age >= 5 && age <= 8) ageGroupEl.value = '5-8';
+        else if (age >= 9 && age <= 12) ageGroupEl.value = '9-12';
+        else ageGroupEl.value = '13-15';
+      }
     }
+
+    // Navigate to generator
     this.navigateTo('generator');
+
+    // Auto-generate after a short delay (wait for section to render)
+    setTimeout(() => {
+      const schoolEl = document.getElementById('school_name');
+      const teacherEl = document.getElementById('teacher_name');
+
+      // Only auto-generate if school and teacher are already filled
+      if (schoolEl && teacherEl && schoolEl.value.trim() && teacherEl.value.trim()) {
+        const form = document.getElementById('generator-form');
+        if (form) form.dispatchEvent(new Event('submit', { cancelable: true }));
+      } else {
+        // Highlight school/teacher fields so user knows what to fill
+        if (schoolEl && !schoolEl.value.trim()) {
+          schoolEl.style.borderColor = '#E8562A';
+          schoolEl.focus();
+          schoolEl.placeholder = '⚠️ Enter school name to generate plan';
+        }
+        if (teacherEl && !teacherEl.value.trim()) {
+          teacherEl.style.borderColor = '#E8562A';
+          teacherEl.placeholder = '⚠️ Enter teacher name to generate plan';
+        }
+      }
+    }, 400);
   },
 
   // ── Meal Plan Generator ───────────────────────────────────
