@@ -148,9 +148,16 @@ def generate_plan():
     month                 = data.get('month', 'June')
 
     if not school_name:
-        return jsonify({"error": "School name is required.", "error_kn": "ಶಾಲೆಯ ಹೆಸರು ಕಡ್ಡಾಯವಾಗಿದೆ."}), 400
+        return jsonify({
+            "error": "School name is required.",
+            "error_kn": "ಶಾಲೆಯ ಹೆಸರು ಕಡ್ಡಾಯವಾಗಿದೆ."
+        }), 400
+
     if not teacher_name:
-        return jsonify({"error": "Class teacher name is required.", "error_kn": "ತರಗತಿ ಶಿಕ್ಷಕರ ಹೆಸರು ಕಡ್ಡಾಯವಾಗಿದೆ."}), 400
+        return jsonify({
+            "error": "Class teacher name is required.",
+            "error_kn": "ತರಗತಿ ಶಿಕ್ಷಕರ ಹೆಸರು ಕಡ್ಡಾಯವಾಗಿದೆ."
+        }), 400
 
     try:
         plan = generate_weekly_meal_plan(
@@ -165,38 +172,14 @@ def generate_plan():
             optimization_strategy=optimization_strategy
         )
 
-    # Save generated plan
-    conn = get_db_connection()
+        return jsonify(plan)
 
-    try:
-        conn.execute("""
-            INSERT INTO saved_plans
-            (
-                teacher_id,
-                student_name,
-                bmi_status,
-                created_at
-            )
-            VALUES (?, ?, ?, datetime('now'))
-        """, (
-            1,
-            student_name if student_name else "Unknown Student",
-            bmi_status if bmi_status else "Normal"
-        ))
-
-        conn.commit()
-
-    except Exception as db_error:
-        print("Dashboard save error:", db_error)
-
-    finally:
-        conn.close()
-
-    return jsonify(plan)
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+        return jsonify({
+            "error": f"Internal Server Error: {str(e)}"
+        }), 500
 
 
 # ── Save Plan + Generate QR Code ─────────────────────────────────────────────
