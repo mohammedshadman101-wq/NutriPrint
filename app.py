@@ -5,6 +5,7 @@ import uuid
 import base64
 import sqlite3
 import qrcode
+import google.generativeai as genai
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -21,7 +22,11 @@ with app.app_context():
     except Exception as e:
         print(f"Error seeding database on startup: {e}")
 
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    
 # ── Static pages ────────────────────────────────────────────────────────────
 
 @app.route('/')
@@ -359,4 +364,43 @@ def dashboard(teacher_id):
 
 
 if __name__ == '__main__':
+    @app.route('/api/ai-advisor', methods=['POST'])
+def ai_advisor():
+    try:
+        data = request.json or {}
+
+        student_name = data.get('student_name', 'Student')
+        bmi_status = data.get('bmi_status', 'Normal')
+        age = data.get('age', '')
+        question = data.get('question', '')
+
+        if not question:
+            question = "Give healthy eating advice for this student."
+
+        prompt = f"""
+You are NutriPrint AI Advisor.
+
+Student Name: {student_name}
+Age: {age}
+BMI Status: {bmi_status}
+
+Question:
+{question}
+
+Give a short, practical answer for parents and school teachers.
+Keep it under 120 words.
+"""
+
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(prompt)
+
+        return jsonify({
+            "reply": response.text
+        })
+
+    except Exception as e:
+        print("Gemini Error:", str(e))
+        return jsonify({
+            "error": str(e)
+        }), 500
     app.run(host='0.0.0.0', port=5001, debug=True)
