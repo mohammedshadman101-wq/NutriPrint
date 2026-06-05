@@ -391,6 +391,23 @@ successState.style.display = 'flex';
     renderMealPlanPoster(data) {
         const schoolMeta = data.school_details;
         const mealPlan = data.meal_plan;
+        // Render QR Code if available
+if (data.qr_image_base64) {
+
+    const qrContainer = document.getElementById('poster-qr-container');
+
+    if (qrContainer) {
+        qrContainer.innerHTML = `
+            <div style="text-align:center;margin-top:20px;">
+                <h4>Scan QR Code for Digital Meal Plan</h4>
+                <img
+                    src="data:image/png;base64,${data.qr_image_base64}"
+                    style="width:140px;height:140px;"
+                >
+            </div>
+        `;
+    }
+}
 
         // Populate poster headers
         document.getElementById('post-school-title').textContent = schoolMeta.school_name;
