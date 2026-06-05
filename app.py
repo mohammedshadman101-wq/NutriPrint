@@ -153,18 +153,46 @@ def generate_plan():
         return jsonify({"error": "Class teacher name is required.", "error_kn": "ತರಗತಿ ಶಿಕ್ಷಕರ ಹೆಸರು ಕಡ್ಡಾಯವಾಗಿದೆ."}), 400
 
     try:
-        plan = generate_weekly_meal_plan(
-            school_name=school_name,
-            teacher_name=teacher_name,
-            age_group=age_group,
-            preference=preference,
-            region=region,
-            month=month,
-            student_name=student_name,
-            bmi_status=bmi_status,
-            optimization_strategy=optimization_strategy
-        )
-        return jsonify(plan)
+    plan = generate_weekly_meal_plan(
+        school_name=school_name,
+        teacher_name=teacher_name,
+        age_group=age_group,
+        preference=preference,
+        region=region,
+        month=month,
+        student_name=student_name,
+        bmi_status=bmi_status,
+        optimization_strategy=optimization_strategy
+    )
+
+    # Save generated plan
+    conn = get_db_connection()
+
+    try:
+        conn.execute("""
+            INSERT INTO saved_plans
+            (
+                teacher_id,
+                student_name,
+                bmi_status,
+                created_at
+            )
+            VALUES (?, ?, ?, datetime('now'))
+        """, (
+            1,
+            student_name if student_name else "Unknown Student",
+            bmi_status if bmi_status else "Normal"
+        ))
+
+        conn.commit()
+
+    except Exception as db_error:
+        print("Dashboard save error:", db_error)
+
+    finally:
+        conn.close()
+
+    return jsonify(plan)
     except Exception as e:
         import traceback
         traceback.print_exc()
