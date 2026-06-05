@@ -3,4 +3,4 @@ Flask-Cors==4.0.1
 gunicorn
 qrcode[pil]
 Pillow
-google-genai
+groq
