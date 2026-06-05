@@ -154,16 +154,16 @@ def generate_plan():
 
     try:
         plan = generate_weekly_meal_plan(
-        school_name=school_name,
-        teacher_name=teacher_name,
-        age_group=age_group,
-        preference=preference,
-        region=region,
-        month=month,
-        student_name=student_name,
-        bmi_status=bmi_status,
-        optimization_strategy=optimization_strategy
-    )
+            school_name=school_name,
+            teacher_name=teacher_name,
+            age_group=age_group,
+            preference=preference,
+            region=region,
+            month=month,
+            student_name=student_name,
+            bmi_status=bmi_status,
+            optimization_strategy=optimization_strategy
+        )
 
     # Save generated plan
     conn = get_db_connection()
