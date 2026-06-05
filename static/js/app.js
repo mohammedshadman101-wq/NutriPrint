@@ -359,11 +359,17 @@ const saveResponse = await fetch('/api/save-plan', {
 
 const qrData = await saveResponse.json();
 
+console.log("SAVE RESPONSE STATUS:", saveResponse.status);
 console.log("QR DATA:", qrData);
 
-planData.qr_image_base64 = qrData.qr_image_base64;
-planData.plan_url = qrData.plan_url;
+if (!saveResponse.ok) {
+    throw new Error(qrData.error || "Failed to save plan");
+}
 
+planData.qr_image_base64 = qrData.qr_image_base64 || '';
+planData.plan_url = qrData.plan_url || '';
+
+console.log("QR IMAGE PRESENT:", !!planData.qr_image_base64);
 } catch (e) {
     console.error('QR generation failed', e);
 }
