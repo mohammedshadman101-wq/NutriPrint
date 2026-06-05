@@ -335,11 +335,42 @@ class NutriPrintApp {
             }
 
             const planData = await response.json();
-            this.renderMealPlanPoster(planData);
 
-            // Transition to success state
-            loadingState.style.display = 'none';
-            successState.style.display = 'flex';
+// Save plan and create QR code
+try {
+    const saveResponse = await fetch('/api/save-plan', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            teacher_id: 1,
+            plan_data: planData,
+            school_name: params.school_name,
+            teacher_name: params.teacher_name,
+            student_name: params.student_name || '',
+            bmi_status: params.bmi_status || '',
+            age_group: params.age_group,
+            preference: params.preference,
+            region: params.region,
+            month: params.month
+        })
+    });
+
+    const qrData = await saveResponse.json();
+
+    planData.qr_image_base64 = qrData.qr_image_base64;
+    planData.plan_url = qrData.plan_url;
+
+} catch (e) {
+    console.error('QR generation failed', e);
+}
+
+this.renderMealPlanPoster(planData);
+
+// Transition to success state
+loadingState.style.display = 'none';
+successState.style.display = 'flex';
         } catch (error) {
             console.error('Error fetching plan:', error);
             alert(`Error: ${error.message}`);
