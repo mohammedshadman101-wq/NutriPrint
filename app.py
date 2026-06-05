@@ -304,34 +304,43 @@ def get_nutrition_library():
         return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
+        
+# ── Teacher Dashboard ───────────────────────────────────────────────────────
+
+@app.route('/api/dashboard/<int:teacher_id>', methods=['GET'])
+def dashboard(teacher_id):
+    conn = get_db_connection()
+
+    try:
+        students = conn.execute(
+            "SELECT * FROM students WHERE teacher_id = ?",
+            (teacher_id,)
+        ).fetchall()
+
+        plans = conn.execute(
+            """
+            SELECT
+                student_name,
+                bmi_status,
+                created_at
+            FROM saved_plans
+            WHERE teacher_id = ?
+            ORDER BY created_at DESC
+            """,
+            (teacher_id,)
+        ).fetchall()
+
+        return jsonify({
+            "students": [dict(x) for x in students],
+            "plans": [dict(x) for x in plans]
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        conn.close()
 
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
-    @app.route('/api/dashboard/<int:teacher_id>')
-def dashboard(teacher_id):
-    conn = get_db_connection()
-
-    students = conn.execute(
-        "SELECT * FROM students WHERE teacher_id=?",
-        (teacher_id,)
-    ).fetchall()
-
-    plans = conn.execute(
-        """
-        SELECT student_name,
-               bmi_status,
-               created_at
-        FROM saved_plans
-        WHERE teacher_id=?
-        ORDER BY created_at DESC
-        """,
-        (teacher_id,)
-    ).fetchall()
-
-    conn.close()
-
-    return jsonify({
-        "students": [dict(x) for x in students],
-        "plans": [dict(x) for x in plans]
-    })
