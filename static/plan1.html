@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NutriPrint — Meal Plan</title>
+  <link rel="manifest" href="/manifest.json">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #F0FDF9; color: #1A1A2E; }
+
+    .header {
+      background: linear-gradient(135deg, #1D9E75, #15796A);
+      color: white; padding: 20px; text-align: center;
+    }
+    .header h1 { font-size: 22px; font-weight: 800; }
+    .header p { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+
+    .plan-meta {
+      background: white; margin: 16px; border-radius: 12px;
+      padding: 16px; border: 1px solid #BBF7D0;
+    }
+    .meta-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+    .meta-label { color: #64748B; font-weight: 600; }
+    .meta-value { color: #1A1A2E; font-weight: 700; }
+    .bmi-badge {
+      display: inline-block; padding: 4px 12px; border-radius: 20px;
+      font-size: 11px; font-weight: 700;
+    }
+
+    .section-title {
+      font-size: 14px; font-weight: 800; color: #1D9E75;
+      padding: 0 16px; margin: 20px 0 12px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    .day-card {
+      background: white; margin: 0 16px 16px; border-radius: 12px;
+      overflow: hidden; border: 1px solid #E2E8F0;
+    }
+    .day-header {
+      background: linear-gradient(135deg, #1D9E75, #15796A);
+      color: white; padding: 10px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .day-name { font-size: 14px; font-weight: 700; }
+    .day-name-kn { font-size: 11px; opacity: 0.8; }
+    .day-cost { font-size: 12px; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; }
+
+    .meal-row {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 12px 16px; border-bottom: 1px solid #F1F5F9;
+    }
+    .meal-row:last-child { border-bottom: none; }
+    .meal-icon { font-size: 22px; flex-shrink: 0; width: 32px; text-align: center; }
+    .meal-slot-label { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; }
+    .meal-name-en { font-size: 14px; font-weight: 700; color: #1A1A2E; margin: 2px 0; }
+    .meal-name-kn { font-size: 12px; color: #64748B; }
+    .meal-nutrition {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;
+    }
+    .nutrition-tag {
+      background: #F0FDF4; border: 1px solid #BBF7D0;
+      border-radius: 4px; padding: 2px 6px; font-size: 10px;
+      font-weight: 700; color: #166534;
+    }
+    .cost-tag {
+      background: #FEF3C7; border: 1px solid #FDE68A;
+      border-radius: 4px; padding: 2px 6px; font-size: 10px;
+      font-weight: 700; color: #B45309;
+    }
+
+    /* Recipe expandable */
+    .recipe-toggle {
+      background: #F8FAFC; border: none; width: 100%;
+      text-align: left; padding: 8px 16px; font-size: 12px;
+      color: #1D9E75; font-weight: 700; cursor: pointer;
+      border-top: 1px solid #F1F5F9;
+    }
+    .recipe-content {
+      display: none; padding: 12px 16px;
+      background: #FAFFFE; border-top: 1px solid #E8FDF5;
+    }
+    .recipe-content.open { display: block; }
+    .recipe-ingredients { font-size: 12px; color: #475569; line-height: 1.7; margin-bottom: 10px; }
+    .recipe-step { display: flex; gap: 8px; margin-bottom: 6px; font-size: 12px; color: #475569; }
+    .step-num {
+      background: #1D9E75; color: white; width: 18px; height: 18px;
+      border-radius: 50%; font-size: 10px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .recipe-tip {
+      background: #FFFBEB; border-left: 3px solid #F59E0B;
+      padding: 8px 12px; border-radius: 4px; font-size: 11px;
+      color: #92400E; margin-top: 8px; font-style: italic;
+    }
+
+    .nutrition-summary {
+      background: #1A1A2E; color: white; margin: 0 16px 16px;
+      border-radius: 12px; padding: 16px;
+    }
+    .nutrition-summary h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; color: #1D9E75; }
+    .summary-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+    .summary-item { background: rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; text-align: center; }
+    .summary-num { font-size: 18px; font-weight: 800; color: #1D9E75; }
+    .summary-label { font-size: 10px; color: rgba(255,255,255,0.7); margin-top: 2px; }
+
+    .footer {
+      text-align: center; padding: 24px 16px; color: #64748B; font-size: 12px;
+    }
+    .footer strong { color: #1D9E75; }
+
+    .loading { text-align: center; padding: 60px; color: #64748B; }
+    .error { text-align: center; padding: 40px; color: #EF4444; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🌾 NutriPrint</h1>
+  <p>Karnataka School Nutrition Plan • ಕರ್ನಾಟಕ ಶಾಲಾ ಪೌಷ್ಟಿಕಾಂಶ ಯೋಜನೆ</p>
+</div>
+
+<div id="app">
+  <div class="loading">Loading your meal plan...</div>
+</div>
+
+<script>
+const FOOD_EMOJIS = {
+  'Ragi Mudde':'🌾','Ragi Dosa':'🥞','Ragi Roti':'🫓',
+  'Jowar Roti':'🫓','Jowar Dosa':'🥞','Sprout Upma':'🥗',
+  'Idli':'🍥','Sambar Rice':'🍚','Coconut Rice':'🥥',
+  'Khichdi':'🍲','Curd Rice':'🍚','Vegetable Pulao':'🍚',
+  'Sweet Potato':'🍠','Banana':'🍌','Groundnut Chikki':'🍬',
+  'Egg Curry':'🥚','Fish Curry':'🐟','Chicken Curry':'🍗',
+  'Chapati':'🫓','Poha':'🥣',
+};
+
+function getEmoji(name) {
+  if (!name) return '🍽️';
+  for (const k in FOOD_EMOJIS) {
+    if (name.toLowerCase().includes(k.toLowerCase())) return FOOD_EMOJIS[k];
+  }
+  return '🍽️';
+}
+
+function toggleRecipe(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+}
+
+async function loadPlan() {
+  const qrCode = window.location.pathname.split('/plan/')[1];
+  if (!qrCode) {
+    document.getElementById('app').innerHTML = '<div class="error">Invalid plan link.</div>';
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/api/plan/${qrCode}`);
+    if (!resp.ok) throw new Error('Plan not found');
+    const data = await resp.json();
+    renderPlan(data);
+  } catch (e) {
+    document.getElementById('app').innerHTML =
+      '<div class="error">Plan not found or expired.<br>Please ask the teacher for a new plan.</div>';
+  }
+}
+
+function renderPlan(data) {
+  const { school_name, teacher_name, student_name, bmi_status, month, plan_data } = data;
+  const { meal_plan, school_details } = plan_data;
+
+  const statusColor = bmi_status === 'Normal' ? '#10B981'
+    : bmi_status === 'Underweight' ? '#F59E0B' : '#EF4444';
+
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const slots = ['breakfast','lunch','snack','dinner'];
+  const slotIcons = { breakfast:'🌅', lunch:'☀️', snack:'🌤️', dinner:'🌙' };
+  const slotNames = { breakfast:'Breakfast / ಬೆಳಗಿನ ತಿಂಡಿ', lunch:'Lunch / ಮಧ್ಯಾಹ್ನದ ಊಟ', snack:'Snack / ಸಂಜೆ ತಿಂಡಿ', dinner:'Dinner / ರಾತ್ರಿ ಊಟ' };
+
+  // Calculate weekly averages
+  let totalProtein = 0, totalCalcium = 0, totalIron = 0, totalCost = 0, dayCount = 0;
+  days.forEach(day => {
+    const n = meal_plan[day]?.nutrients;
+    if (n) { totalProtein += n.protein; totalCalcium += n.calcium; totalIron += n.iron; totalCost += n.cost; dayCount++; }
+  });
+
+  const html = `
+    <div class="plan-meta">
+      <div class="meta-row">
+        <span class="meta-label">School / ಶಾಲೆ</span>
+        <span class="meta-value">${school_name}</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Teacher / ಶಿಕ್ಷಕರು</span>
+        <span class="meta-value">${teacher_name}</span>
+      </div>
+      ${student_name ? `
+      <div class="meta-row">
+        <span class="meta-label">Student / ವಿದ್ಯಾರ್ಥಿ</span>
+        <span class="meta-value">${student_name}</span>
+      </div>` : ''}
+      ${bmi_status ? `
+      <div class="meta-row">
+        <span class="meta-label">Growth Status</span>
+        <span class="bmi-badge" style="background:${statusColor}20;color:${statusColor}">${bmi_status}</span>
+      </div>` : ''}
+      <div class="meta-row">
+        <span class="meta-label">Month / ತಿಂಗಳು</span>
+        <span class="meta-value">${month} 2026</span>
+      </div>
+      ${school_details?.portion_label_en ? `
+      <div style="margin-top:8px;font-size:11px;color:#64748B;background:#F8FAFC;padding:8px;border-radius:6px;">
+        📏 ${school_details.portion_label_en}
+      </div>` : ''}
+    </div>
+
+    <div class="section-title">📅 Weekly Meal Plan / ಸಾಪ್ತಾಹಿಕ ಊಟದ ವೇಳಾಪಟ್ಟಿ</div>
+
+    ${days.map(day => {
+      const dayData = meal_plan[day];
+      if (!dayData) return '';
+      const n = dayData.nutrients;
+      const dayKn = dayData.day_kn || '';
+
+      return `
+        <div class="day-card">
+          <div class="day-header">
+            <div>
+              <div class="day-name">${day}</div>
+              <div class="day-name-kn">${dayKn}</div>
+            </div>
+            ${n ? `<div class="day-cost">₹${n.cost}</div>` : ''}
+          </div>
+
+          ${slots.map(slot => {
+            const food = dayData[slot];
+            if (!food) return '';
+            const emoji = getEmoji(food.name_en);
+            const recipeId = `recipe-${day}-${slot}`;
+            const hasRecipe = food.ingredients || food.recipe_steps;
+
+            return `
+              <div class="meal-row">
+                <div class="meal-icon">${emoji}</div>
+                <div style="flex:1">
+                  <div class="meal-slot-label">${slotIcons[slot]} ${slotNames[slot]}</div>
+                  <div class="meal-name-en">${food.name_en || ''}</div>
+                  <div class="meal-name-kn">${food.name_kn || ''}</div>
+                  <div class="meal-nutrition">
+                    <span class="nutrition-tag">📏 ${food.serving_size || '1 portion'}</span>
+                    <span class="nutrition-tag">P: ${food.scaled_protein ?? food.protein ?? 0}g</span>
+                    <span class="nutrition-tag">Ca: ${food.scaled_calcium ?? food.calcium ?? 0}mg</span>
+                    <span class="nutrition-tag">Fe: ${food.scaled_iron ?? food.iron ?? 0}mg</span>
+                    <span class="cost-tag">₹${food.scaled_cost ?? food.cost ?? 0}</span>
+                  </div>
+                </div>
+              </div>
+              ${hasRecipe ? `
+                <button class="recipe-toggle" onclick="toggleRecipe('${recipeId}')">
+                  👩‍🍳 How to make ${food.name_en} / ಅಡುಗೆ ವಿಧಾನ ▼
+                </button>
+                <div class="recipe-content" id="${recipeId}">
+                  ${food.ingredients ? `
+                    <div class="recipe-ingredients">
+                      🛒 <strong>Ingredients:</strong> ${food.ingredients}
+                    </div>
+                  ` : ''}
+                  ${food.recipe_steps ? food.recipe_steps.split('.').filter(s => s.trim()).map((s, i) => `
+                    <div class="recipe-step">
+                      <span class="step-num">${i+1}</span>
+                      <span>${s.trim()}.</span>
+                    </div>
+                  `).join('') : ''}
+                  <div class="recipe-tip">💡 ${food.recipe_tip_en || ''}</div>
+                  ${food.recipe_tip_kn ? `<div class="recipe-tip" style="margin-top:6px">ಸಲಹೆ: ${food.recipe_tip_kn}</div>` : ''}
+                </div>
+              ` : ''}
+            `;
+          }).join('')}
+        </div>
+      `;
+    }).join('')}
+
+    <div class="nutrition-summary">
+      <h3>📊 Weekly Nutrition Summary / ಒಟ್ಟು ಪೌಷ್ಟಿಕಾಂಶ</h3>
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="summary-num">${(totalProtein/dayCount).toFixed(1)}g</div>
+          <div class="summary-label">Daily Protein</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-num">${(totalCalcium/dayCount).toFixed(0)}mg</div>
+          <div class="summary-label">Daily Calcium</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-num">${(totalIron/dayCount).toFixed(1)}mg</div>
+          <div class="summary-label">Daily Iron</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-num">₹${(totalCost/dayCount).toFixed(0)}</div>
+          <div class="summary-label">Daily Cost</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Generated by <strong>NutriPrint</strong> •
+      <strong>${school_name}</strong><br>
+      nutriprint.onrender.com • ಕರ್ನಾಟಕ ಶಾಲಾ ಪೌಷ್ಟಿಕಾಂಶ ವೇದಿಕೆ
+    </div>
+  `;
+
+  document.getElementById('app').innerHTML = html;
+}
+
+loadPlan();
+</script>
+</body>
+</html>
