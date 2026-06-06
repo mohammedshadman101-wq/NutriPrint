@@ -830,5 +830,340 @@ const app = {
   document.head.appendChild(style);
 })();
 
+// ═══════════════════════════════════════════════════════════
+// BULK GENERATE — Add these methods to the app object
+// Add them after the existing loadDashboard() method
+// ═══════════════════════════════════════════════════════════
+
+  async generateAllPosters() {
+    if (!this.students || !this.students.length) {
+      this.showToast('No students found. Add students first!');
+      return;
+    }
+
+    const studentsWithBMI = this.students.filter(s => s.latest_bmi);
+    if (!studentsWithBMI.length) {
+      this.showToast('No students have BMI recorded yet. Measure BMI first!');
+      return;
+    }
+
+    // Show bulk progress modal
+    const modal = document.createElement('div');
+    modal.id = 'bulk-modal';
+    modal.className = 'auth-modal-overlay';
+    modal.innerHTML = `
+      <div class="auth-modal-box" style="max-width:480px">
+        <h3 style="margin-bottom:8px">🍽️ Generating All Posters</h3>
+        <p style="font-size:13px;color:#64748B;margin-bottom:20px">
+          Creating meal plans for ${studentsWithBMI.length} students...
+        </p>
+
+        <div class="bulk-progress-bar-wrap">
+          <div class="bulk-progress-bar" id="bulk-progress-bar" style="width:0%"></div>
+        </div>
+        <p id="bulk-progress-text" style="font-size:12px;color:#64748B;margin-top:8px;text-align:center">
+          Starting...
+        </p>
+
+        <div id="bulk-student-list" style="margin-top:16px;max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:8px"></div>
+
+        <div id="bulk-done-actions" style="display:none;margin-top:20px;display:none;gap:10px;flex-direction:column">
+          <button class="auth-submit-btn" onclick="app.printAllPlans()">
+            🖨️ Print All Plans
+          </button>
+          <button style="background:#F0FDF4;color:#1D9E75;border:1.5px solid #1D9E75;border-radius:8px;padding:10px;font-weight:700;cursor:pointer"
+            onclick="document.getElementById('bulk-modal').remove()">
+            ✓ Done
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+
+    this.bulkPlanResults = [];
+    const listEl = document.getElementById('bulk-student-list');
+    const barEl  = document.getElementById('bulk-progress-bar');
+    const textEl = document.getElementById('bulk-progress-text');
+
+    for (let i = 0; i < studentsWithBMI.length; i++) {
+      const student = studentsWithBMI[i];
+      const bmi     = student.latest_bmi;
+
+      // Update progress
+      const pct = Math.round(((i) / studentsWithBMI.length) * 100);
+      barEl.style.width = `${pct}%`;
+      textEl.textContent = `Generating ${i + 1} of ${studentsWithBMI.length}: ${student.name}...`;
+
+      // Add student row as "loading"
+      const rowId = `bulk-row-${student.id}`;
+      const row = document.createElement('div');
+      row.id = rowId;
+      row.className = 'bulk-student-row bulk-student-loading';
+      row.innerHTML = `
+        <div class="bulk-student-info">
+          <span class="bulk-student-avatar">${student.gender === 'Girl' ? '👧' : '👦'}</span>
+          <div>
+            <strong>${student.name}</strong>
+            <span style="font-size:11px;color:#64748B"> · ${bmi.status}</span>
+          </div>
+        </div>
+        <span class="bulk-status-tag loading">⏳ Generating...</span>
+      `;
+      listEl.appendChild(row);
+      listEl.scrollTop = listEl.scrollHeight;
+
+      try {
+        const ageGroup = student.age <= 8 ? '5-8' : student.age <= 12 ? '9-12' : '13-15';
+        const resp = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            student_name:          student.name,
+            bmi_status:            bmi.status,
+            bmi_value:             bmi.bmi,
+            age_group:             ageGroup,
+            preference:            'Vegetarian',
+            region:                'All',
+            month:                 new Date().toLocaleString('default', { month: 'long' }),
+            optimization_strategy: bmi.status === 'Underweight' ? 'high_protein'
+                                 : bmi.status === 'Overweight' || bmi.status === 'Obese'
+                                 ? 'high_fiber' : 'standard',
+          }),
+        });
+
+        const plan = await resp.json();
+
+        if (plan.error) throw new Error(plan.error);
+
+        this.bulkPlanResults.push({ student, bmi, plan });
+
+        // Update row to success
+        row.className = 'bulk-student-row bulk-student-done';
+        row.innerHTML = `
+          <div class="bulk-student-info">
+            <span class="bulk-student-avatar">${student.gender === 'Girl' ? '👧' : '👦'}</span>
+            <div>
+              <strong>${student.name}</strong>
+              <span style="font-size:11px;color:#64748B"> · ${bmi.status} (BMI: ${bmi.bmi})</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span class="bulk-status-tag success">✅ Done</span>
+            <button class="bulk-view-btn"
+              onclick="app.viewBulkPlan(${this.bulkPlanResults.length - 1})">
+              View
+            </button>
+          </div>
+        `;
+
+      } catch (e) {
+        row.className = 'bulk-student-row bulk-student-error';
+        row.innerHTML = `
+          <div class="bulk-student-info">
+            <span class="bulk-student-avatar">${student.gender === 'Girl' ? '👧' : '👦'}</span>
+            <div><strong>${student.name}</strong></div>
+          </div>
+          <span class="bulk-status-tag error">❌ Failed</span>
+        `;
+      }
+
+      // Small delay to avoid rate limiting
+      await new Promise(r => setTimeout(r, 400));
+    }
+
+    // Done!
+    barEl.style.width = '100%';
+    barEl.style.background = '#10B981';
+    textEl.textContent = `✅ All ${studentsWithBMI.length} plans generated!`;
+    document.getElementById('bulk-done-actions').style.display = 'flex';
+  },
+
+  viewBulkPlan(index) {
+    const { student, bmi, plan } = this.bulkPlanResults[index];
+    this.lastPlanData = plan;
+    document.getElementById('bulk-modal')?.remove();
+
+    // Pre-fill generator form with student data
+    const schoolEl  = document.getElementById('school_name');
+    const teacherEl = document.getElementById('teacher_name');
+    const studentEl = document.getElementById('student_name');
+    const bmiEl     = document.getElementById('bmi_status_hidden');
+
+    if (schoolEl  && this.currentTeacher) schoolEl.value  = this.currentTeacher.school_name;
+    if (teacherEl && this.currentTeacher) teacherEl.value = this.currentTeacher.name;
+    if (studentEl) studentEl.value = student.name;
+    if (bmiEl)     bmiEl.value     = bmi.status;
+
+    this.renderPoster(plan);
+    this.navigateTo('generator');
+
+    document.getElementById('gen-success').style.display = 'flex';
+    document.getElementById('gen-empty').style.display   = 'none';
+    setTimeout(() => {
+      document.getElementById('gen-success').scrollIntoView({ behavior: 'smooth' });
+    }, 300);
+  },
+
+  printAllPlans() {
+    if (!this.bulkPlanResults?.length) return;
+
+    // Open a new window with all posters for printing
+    const printWin = window.open('', '_blank');
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>NutriPrint — All Class Meal Plans</title>
+        <style>
+          body { font-family: sans-serif; margin: 0; padding: 0; }
+          .poster-page {
+            page-break-after: always;
+            padding: 24px;
+            border-bottom: 2px dashed #E2E8F0;
+          }
+          .poster-header {
+            background: #1D9E75; color: white;
+            padding: 16px 20px; border-radius: 8px 8px 0 0;
+            display: flex; justify-content: space-between; align-items: center;
+          }
+          .poster-header h2 { margin: 0; font-size: 18px; }
+          .poster-header p  { margin: 0; font-size: 12px; opacity: 0.85; }
+          .student-badge {
+            background: #F0FDF4; border: 1.5px solid #1D9E75;
+            border-radius: 8px; padding: 10px 16px;
+            display: flex; gap: 16px; align-items: center;
+            margin: 12px 0; font-size: 13px;
+          }
+          .bmi-tag {
+            padding: 3px 10px; border-radius: 20px;
+            font-weight: 700; font-size: 12px;
+          }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 12px; }
+          th { background: #1D9E75; color: white; padding: 6px 8px; text-align: left; }
+          td { border: 1px solid #E2E8F0; padding: 6px 8px; vertical-align: top; }
+          tr:nth-child(even) td { background: #F8FAFC; }
+          @media print { .poster-page { page-break-after: always; } }
+        </style>
+      </head>
+      <body>
+    `);
+
+    this.bulkPlanResults.forEach(({ student, bmi, plan }) => {
+      const bmiColor = bmi.status === 'Normal'   ? '#10B981'
+                     : bmi.status === 'Underweight' ? '#F59E0B' : '#EF4444';
+
+      const days     = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const slots    = ['breakfast', 'lunch', 'snack', 'dinner'];
+      const slotLabels = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
+
+      let tableRows = '';
+      slots.forEach(slot => {
+        tableRows += `<tr><td><strong>${slotLabels[slot]}</strong></td>`;
+        days.forEach(day => {
+          const food = plan.meal_plan?.[day]?.[slot];
+          tableRows += `<td>${food ? food.name_en : '—'}</td>`;
+        });
+        tableRows += '</tr>';
+      });
+
+      printWin.document.write(`
+        <div class="poster-page">
+          <div class="poster-header">
+            <div>
+              <h2>NutriPrint Weekly Meal Plan</h2>
+              <p>${plan.school_details?.school_name || ''} · ${plan.school_details?.month || ''} 2026</p>
+            </div>
+            <div style="text-align:right;font-size:12px">
+              <div>Teacher: ${plan.school_details?.teacher_name || ''}</div>
+            </div>
+          </div>
+
+          <div class="student-badge">
+            <span style="font-size:24px">${student.gender === 'Girl' ? '👧' : '👦'}</span>
+            <div>
+              <strong style="font-size:15px">${student.name}</strong>
+              <div style="font-size:12px;color:#64748B">Age: ${student.age} · ${student.gender}</div>
+            </div>
+            <span class="bmi-tag" style="background:${bmiColor}20;color:${bmiColor}">
+              ${bmi.status} · BMI: ${bmi.bmi}
+            </span>
+            <div style="font-size:11px;color:#64748B;margin-left:auto">
+              ${plan.school_details?.portion_label_en || ''}
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Meal</th>
+                ${days.map(d => `<th>${d}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </div>
+      `);
+    });
+
+    printWin.document.write('</body></html>');
+    printWin.document.close();
+    setTimeout(() => printWin.print(), 500);
+  },
+
+  // ── Toast notification ────────────────────────────────────
+  showToast(message) {
+    let toast = document.getElementById('nutriprint-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'nutriprint-toast';
+      toast.style.cssText = `
+        position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+        background:#1A1A2E;color:white;padding:12px 24px;border-radius:8px;
+        font-size:13px;font-weight:600;z-index:9999;
+        box-shadow:0 4px 16px rgba(0,0,0,0.2);transition:opacity 0.3s;
+      `;
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.opacity = '1';
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+  },
+
+// ── Add this CSS by appending to the injectStyles function ───
+// Add inside the css template literal in injectStyles():
+
+/*
+    .bulk-progress-bar-wrap {
+      background: #E2E8F0; border-radius: 8px; height: 10px; overflow: hidden;
+    }
+    .bulk-progress-bar {
+      height: 100%; background: #1D9E75;
+      border-radius: 8px; transition: width 0.4s ease;
+    }
+    .bulk-student-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 14px; border-radius: 8px; border: 1px solid #E2E8F0;
+      background: white;
+    }
+    .bulk-student-loading { border-color: #FDE68A; background: #FFFBEB; }
+    .bulk-student-done    { border-color: #BBF7D0; background: #F0FDF4; }
+    .bulk-student-error   { border-color: #FECACA; background: #FEF2F2; }
+    .bulk-student-info    { display: flex; align-items: center; gap: 10px; }
+    .bulk-student-avatar  { font-size: 20px; }
+    .bulk-status-tag {
+      font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+    }
+    .bulk-status-tag.loading { background: #FEF3C7; color: #B45309; }
+    .bulk-status-tag.success { background: #D1FAE5; color: #065F46; }
+    .bulk-status-tag.error   { background: #FEE2E2; color: #991B1B; }
+    .bulk-view-btn {
+      font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 6px;
+      background: #1D9E75; color: white; border: none; cursor: pointer;
+    }
+*/
+
 // ── Boot ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => app.init());
