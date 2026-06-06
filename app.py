@@ -8,6 +8,7 @@ import urllib.error
 from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory, session
 from flask_cors import CORS
+from groq import Groq
 from database import init_db, get_db_connection
 from meal_generator import generate_weekly_meal_plan
 
@@ -21,6 +22,8 @@ with app.app_context():
         print("Database ready.")
     except Exception as e:
         print(f"DB init error: {e}")
+
+groq_client = Groq(api_key=os.environ.get('GROQ_API_KEY'))
 
 # ── Static files ──────────────────────────────────────────
 @app.route('/')
@@ -57,7 +60,7 @@ def get_current_teacher():
     return dict(teacher) if teacher else None
 
 # ═══════════════════════════════════════════════════════════
-# PHASE 1 — AUTH: Login / Signup
+# PHASE 1 — AUTH
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/auth/signup', methods=['POST'])
 def signup():
@@ -92,11 +95,9 @@ def signup():
     return jsonify({
         'success': True,
         'teacher': {
-            'id': teacher['id'],
-            'name': teacher['name'],
+            'id': teacher['id'], 'name': teacher['name'],
             'school_name': teacher['school_name'],
-            'district': teacher['district'],
-            'phone': teacher['phone'],
+            'district': teacher['district'], 'phone': teacher['phone'],
         }
     })
 
@@ -120,11 +121,9 @@ def login():
     return jsonify({
         'success': True,
         'teacher': {
-            'id': teacher['id'],
-            'name': teacher['name'],
+            'id': teacher['id'], 'name': teacher['name'],
             'school_name': teacher['school_name'],
-            'district': teacher['district'],
-            'phone': teacher['phone'],
+            'district': teacher['district'], 'phone': teacher['phone'],
         }
     })
 
@@ -141,16 +140,14 @@ def get_me():
     return jsonify({
         'logged_in': True,
         'teacher': {
-            'id': teacher['id'],
-            'name': teacher['name'],
+            'id': teacher['id'], 'name': teacher['name'],
             'school_name': teacher['school_name'],
-            'district': teacher['district'],
-            'phone': teacher['phone'],
+            'district': teacher['district'], 'phone': teacher['phone'],
         }
     })
 
 # ═══════════════════════════════════════════════════════════
-# PHASE 2 — CLASS DASHBOARD: Students + BMI Records
+# PHASE 2 — STUDENTS + BMI
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/students', methods=['GET'])
 def get_students():
@@ -160,21 +157,17 @@ def get_students():
 
     conn = get_db_connection()
     students = conn.execute(
-        'SELECT * FROM students WHERE teacher_id = ? ORDER BY name',
-        (teacher['id'],)
+        'SELECT * FROM students WHERE teacher_id = ? ORDER BY name', (teacher['id'],)
     ).fetchall()
 
     result = []
     for s in students:
         s = dict(s)
-        # Get latest BMI record
         bmi = conn.execute(
             'SELECT * FROM bmi_records WHERE student_id = ? ORDER BY recorded_at DESC LIMIT 1',
             (s['id'],)
         ).fetchone()
         s['latest_bmi'] = dict(bmi) if bmi else None
-
-        # Get BMI history for chart
         history = conn.execute(
             'SELECT bmi, status, recorded_at FROM bmi_records WHERE student_id = ? ORDER BY recorded_at',
             (s['id'],)
@@ -219,15 +212,10 @@ def save_bmi(student_id):
         return jsonify({'error': 'Not logged in'}), 401
 
     data = request.json or {}
-    height = data.get('height')
-    weight = data.get('weight')
-    bmi = data.get('bmi')
-    status = data.get('status')
-
     conn = get_db_connection()
     conn.execute(
         'INSERT INTO bmi_records (student_id, height, weight, bmi, status) VALUES (?, ?, ?, ?, ?)',
-        (student_id, height, weight, bmi, status)
+        (student_id, data.get('height'), data.get('weight'), data.get('bmi'), data.get('status'))
     )
     conn.commit()
     conn.close()
@@ -247,13 +235,12 @@ def delete_student(student_id):
     return jsonify({'success': True})
 
 # ═══════════════════════════════════════════════════════════
-# PHASE 3 — MEAL PLAN GENERATOR + QR CODE + RECIPES
+# PHASE 3 — MEAL PLAN + QR CODE
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/generate', methods=['POST'])
 def generate_plan():
     data = request.json or {}
 
-    # If logged in, auto-fill school and teacher name
     teacher = get_current_teacher()
     if teacher:
         school_name = data.get('school_name') or teacher['school_name']
@@ -278,18 +265,12 @@ def generate_plan():
 
     try:
         plan = generate_weekly_meal_plan(
-            school_name=school_name,
-            teacher_name=teacher_name,
-            age_group=age_group,
-            preference=preference,
-            region=region,
-            month=month,
-            student_name=student_name,
-            bmi_status=bmi_status,
+            school_name=school_name, teacher_name=teacher_name,
+            age_group=age_group, preference=preference, region=region,
+            month=month, student_name=student_name, bmi_status=bmi_status,
             optimization_strategy=optimization_strategy
         )
 
-        # Generate unique QR code ID and save plan
         qr_code = str(uuid.uuid4())[:8].upper()
         if teacher:
             conn = get_db_connection()
@@ -303,8 +284,6 @@ def generate_plan():
                 school_name, teacher_name, student_name, bmi_status,
                 age_group, preference, region, month
             ))
-
-            # Save BMI record if student_id provided
             if student_id and bmi_status and data.get('bmi_value'):
                 conn.execute(
                     'INSERT INTO bmi_records (student_id, height, weight, bmi, status) VALUES (?, ?, ?, ?, ?)',
@@ -323,7 +302,6 @@ def generate_plan():
         traceback.print_exc()
         return jsonify({"error": f"Error: {str(e)}"}), 500
 
-# Public plan page (QR scan opens this)
 @app.route('/plan/<qr_code>')
 def view_plan(qr_code):
     return send_from_directory(app.static_folder, 'plan.html')
@@ -331,9 +309,7 @@ def view_plan(qr_code):
 @app.route('/api/plan/<qr_code>', methods=['GET'])
 def get_plan(qr_code):
     conn = get_db_connection()
-    plan_row = conn.execute(
-        'SELECT * FROM saved_plans WHERE qr_code = ?', (qr_code,)
-    ).fetchone()
+    plan_row = conn.execute('SELECT * FROM saved_plans WHERE qr_code = ?', (qr_code,)).fetchone()
     conn.close()
 
     if not plan_row:
@@ -342,7 +318,6 @@ def get_plan(qr_code):
     plan_row = dict(plan_row)
     plan_data = json.loads(plan_row['plan_data'])
 
-    # Enhance with full recipe data
     conn = get_db_connection()
     foods = {row['name_en']: dict(row) for row in conn.execute('SELECT * FROM foods').fetchall()}
     conn.close()
@@ -414,7 +389,6 @@ def get_nutrition_library():
     finally:
         conn.close()
 
-# Recipe detail
 @app.route('/api/recipe/<int:food_id>', methods=['GET'])
 def get_recipe(food_id):
     conn = get_db_connection()
@@ -425,7 +399,7 @@ def get_recipe(food_id):
     return jsonify(dict(food))
 
 # ═══════════════════════════════════════════════════════════
-# PHASE 4 — GEMINI AI ADVISOR
+# PHASE 4 — AI ADVISOR (Groq)
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/ai-advisor', methods=['POST'])
 def ai_advisor():
@@ -439,38 +413,28 @@ def ai_advisor():
     region = data.get('region', 'Karnataka')
     question = data.get('question', '').strip()
 
-    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
-
-    if not GEMINI_API_KEY:
-        return jsonify({
-            "reply": "AI Advisor is not configured yet. Add GEMINI_API_KEY to Render environment variables.",
-        }), 200
-
-    system_prompt = """You are NutriPrint AI, a friendly school nutrition advisor for Karnataka, India.
-Help PT teachers and parents understand children dietary needs based on BMI.
+    try:
+        prompt = f"""You are NutriPrint AI, a friendly school nutrition advisor for Karnataka, India.
+Help PT teachers and parents understand children's dietary needs based on BMI.
 Always recommend locally available Karnataka foods: Ragi, Jowar, Millets, Coconut Rice, Sambar, Idli, Dosa.
-Keep replies short, practical, under 150 words. Give serving sizes in simple terms like 1 cup, 2 rotis, 1 bowl."""
+Keep replies short, practical, under 150 words. Give serving sizes in simple terms like 1 cup, 2 rotis, 1 bowl.
 
-    user_message = f"""Student: {student_name}, Age: {age}, Gender: {gender}
+Student: {student_name}, Age: {age}, Gender: {gender}
 BMI: {bmi_status} ({bmi_value}), Diet: {preference}, Region: {region}
 Question: {question if question else f'What should {student_name} eat this week? Give a 3-day meal suggestion with serving sizes.'}"""
 
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-        payload = {
-            "contents": [{"parts": [{"text": system_prompt + "\n\n" + user_message}]}],
-            "generationConfig": {"temperature": 0.7, "maxOutputTokens": 300}
-        }
-        req = urllib.request.Request(
-            url, data=json.dumps(payload).encode('utf-8'),
-            headers={'Content-Type': 'application/json'}, method='POST'
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300
         )
-        with urllib.request.urlopen(req, timeout=15) as response:
-            result = json.loads(response.read().decode('utf-8'))
-            reply = result['candidates'][0]['content']['parts'][0]['text']
-            return jsonify({"reply": reply})
+        reply = response.choices[0].message.content
+        return jsonify({"reply": reply})
+
     except Exception as e:
+        print("Groq Error:", str(e))
         return jsonify({"reply": "AI Advisor is temporarily unavailable. Please try again."}), 200
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
