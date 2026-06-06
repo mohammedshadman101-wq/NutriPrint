@@ -540,7 +540,7 @@ const app = {
             <span class="ai-icon">🤖</span>
             <div>
               <h3>NutriPrint AI Advisor</h3>
-              <p>Powered by Gemini AI • ಕರ್ನಾಟಕ ಪೌಷ್ಟಿಕಾಂಶ ಸಲಹೆಗಾರ</p>
+              <p>Powered by Groq AI • ಕರ್ನಾಟಕ ಪೌಷ್ಟಿಕಾಂಶ ಸಲಹೆಗಾರ</p>
             </div>
           </div>
           <button class="ai-advisor-close"
