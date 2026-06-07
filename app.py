@@ -421,6 +421,7 @@ def get_saved_plans():
 # NUTRITION LIBRARY
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/nutrition', methods=['GET'])
+
 def get_nutrition_library():
     print("NUTRITION API HIT - VERSION 2")
     search_query = request.args.get('search', '').strip()
@@ -461,6 +462,15 @@ def get_recipe(food_id):
     if not food:
         return jsonify({'error': 'Not found'}), 404
     return jsonify(food)
+
+@app.route('/api/debug-foods')
+def debug_foods():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id, name_en FROM foods LIMIT 20")
+    rows = cur.fetchall()
+    conn.close()
+    return jsonify(rows)
 
 # ═══════════════════════════════════════════════════════════
 # PHASE 4 — AI ADVISOR (Groq)
