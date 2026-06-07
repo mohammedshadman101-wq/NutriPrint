@@ -57,6 +57,97 @@ const app = {
   currentTeacher:  null,
   students:        [],
   bulkPlanResults: [],
+  addAIAdviceToPlanner(replyId) {
+  const replyEl = document.getElementById(replyId);
+  const text    = replyEl ? replyEl.innerText.trim() : '';
+
+  if (!text) {
+    this.showToast('No advice to add.');
+    return;
+  }
+
+  // Store AI advice list
+  if (!this.aiAdviceNotes) this.aiAdviceNotes = [];
+  this.aiAdviceNotes.push(text);
+
+  // Update the poster footer with AI advice
+  this.updatePosterWithAIAdvice();
+
+  // Hide the Yes/No buttons
+  replyEl?.parentElement?.querySelector('[onclick*="addAIAdviceToPlanner"]')
+    ?.parentElement?.remove();
+
+  // Show confirmation on the reply card
+  replyEl?.insertAdjacentHTML('afterend', `
+    <div style="margin-top:8px;background:#D1FAE5;border-radius:6px;padding:6px 10px;font-size:11px;color:#065F46;font-weight:700">
+      ✅ Added to meal plan poster!
+    </div>
+  `);
+
+  this.showToast('AI advice added to poster! 📋');
+
+  // If generator section is not active, prompt to view
+  if (this.currentSection !== 'generator') {
+    setTimeout(() => {
+      if (confirm('AI advice added! Go to Meal Planner to see it on the poster?')) {
+        this.navigateTo('generator');
+      }
+    }, 500);
+  }
+},
+
+updatePosterWithAIAdvice() {
+  if (!this.aiAdviceNotes?.length) return;
+
+  // Find or create the AI advice box inside the poster
+  let adviceBox = document.getElementById('poster-ai-advice');
+
+  if (!adviceBox) {
+    // Create new box and insert before poster footer
+    adviceBox = document.createElement('div');
+    adviceBox.id = 'poster-ai-advice';
+    adviceBox.style.cssText = `
+      margin: 10px 0;
+      background: linear-gradient(135deg, #F0FDF9, #ECFDF5);
+      border: 1.5px solid #1D9E75;
+      border-radius: 8px;
+      padding: 10px 14px;
+    `;
+
+    // Insert before poster footer
+    const posterFooter = document.querySelector('.poster-footer');
+    if (posterFooter) {
+      posterFooter.insertAdjacentElement('beforebegin', adviceBox);
+    } else {
+      // Fallback — append to poster
+      const poster = document.getElementById('printable-poster');
+      if (poster) poster.appendChild(adviceBox);
+    }
+  }
+
+  // Build the content
+  adviceBox.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="font-size:14px">🤖</span>
+      <strong style="font-size:10px;color:#1D9E75;text-transform:uppercase;letter-spacing:0.5px">
+        AI Nutrition Advisor Notes
+      </strong>
+      <span style="font-size:9px;color:#64748B;margin-left:auto">Powered by Groq AI</span>
+    </div>
+    ${this.aiAdviceNotes.map((note, i) => `
+      <div style="display:flex;gap:8px;margin-bottom:${i < this.aiAdviceNotes.length-1 ? '8px' : '0'};padding-bottom:${i < this.aiAdviceNotes.length-1 ? '8px' : '0'};${i < this.aiAdviceNotes.length-1 ? 'border-bottom:1px solid #BBF7D0' : ''}">
+        <span style="background:#1D9E75;color:white;width:16px;height:16px;border-radius:50%;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${i+1}</span>
+        <p style="font-size:9px;color:#334155;line-height:1.5;margin:0">${note}</p>
+      </div>
+    `).join('')}
+    <div style="margin-top:8px;font-size:8px;color:#94A3B8;border-top:1px solid #BBF7D0;padding-top:6px">
+      💡 These notes are AI-generated suggestions. Consult a doctor for medical advice.
+    </div>
+  `;
+
+  // Also clear AI advice when regenerating
+  // (already handled since renderPoster rebuilds the poster)
+},
 
   // ── Init ──────────────────────────────────────────────────
   async init() {
@@ -427,6 +518,8 @@ const app = {
       this.renderPoster(data);
       document.getElementById('gen-success').style.display = 'flex';
       document.getElementById('gen-success').scrollIntoView({ behavior: 'smooth' });
+      // Show WhatsApp share box
+      this.showWhatsAppBox(data.qr_code);
     } catch (err) {
       alert('Error generating plan. Please check your connection and try again.');
       console.error(err);
@@ -436,6 +529,131 @@ const app = {
   },
 
   regeneratePlan() {
+    showWhatsAppBox(qrCode) {
+  // Remove old box if exists
+  document.getElementById('whatsapp-share-box')?.remove();
+
+  const planUrl = qrCode
+    ? `${window.location.origin}/plan/${qrCode}`
+    : window.location.href;
+
+  const box = document.createElement('div');
+  box.id = 'whatsapp-share-box';
+  box.style.cssText = `
+    margin: 16px;
+    background: linear-gradient(135deg, #F0FFF4, #DCFCE7);
+    border: 2px solid #25D366;
+    border-radius: 14px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  `;
+
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:28px">📱</span>
+      <div>
+        <h4 style="margin:0;font-size:15px;font-weight:800;color:#1A1A2E">
+          Send to Parent via WhatsApp
+        </h4>
+        <p style="margin:2px 0 0;font-size:12px;color:#64748B">
+          Parent receives a link to view the full meal plan with recipes in English + Kannada
+        </p>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;align-items:center">
+      <div style="position:relative;flex:1">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:700;color:#64748B">+91</span>
+        <input
+          type="tel"
+          id="parent-whatsapp-number"
+          placeholder="Parent's WhatsApp number"
+          maxlength="10"
+          style="width:100%;padding:10px 12px 10px 44px;border:1.5px solid #BBF7D0;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box;font-family:inherit"
+          oninput="this.value=this.value.replace(/[^0-9]/g,'')"
+          onkeydown="if(event.key==='Enter') app.sendWhatsApp('${planUrl}')"
+        >
+      </div>
+      <button
+        onclick="app.sendWhatsApp('${planUrl}')"
+        style="background:#25D366;color:white;border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+          <path d="M12 0C5.373 0 0 5.373 0 12c0 2.098.543 4.063 1.496 5.77L0 24l6.396-1.676A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.804 9.804 0 01-5.002-1.368l-.359-.213-3.797.995 1.013-3.686-.233-.374A9.796 9.796 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/>
+        </svg>
+        Send
+      </button>
+    </div>
+
+    <div id="wa-status-msg" style="display:none;font-size:12px;padding:8px 12px;border-radius:6px"></div>
+
+    <div style="font-size:11px;color:#64748B;display:flex;align-items:center;gap:6px">
+      <span>💡</span>
+      <span>This opens WhatsApp with the plan link pre-filled. Teacher just taps Send.</span>
+    </div>
+  `;
+
+  // Insert after poster actions bar
+  const actionsBar = document.querySelector('.poster-actions-bar');
+  if (actionsBar) {
+    actionsBar.insertAdjacentElement('afterend', box);
+  } else {
+    const genSuccess = document.getElementById('gen-success');
+    if (genSuccess) genSuccess.appendChild(box);
+  }
+},
+
+sendWhatsApp(planUrl) {
+  const input   = document.getElementById('parent-whatsapp-number');
+  const statusEl = document.getElementById('wa-status-msg');
+  const number  = input?.value?.trim();
+
+  if (!number || number.length !== 10) {
+    if (statusEl) {
+      statusEl.textContent = '⚠️ Please enter a valid 10-digit WhatsApp number.';
+      statusEl.style.cssText = 'display:block;background:#FEF3C7;color:#B45309;font-size:12px;padding:8px 12px;border-radius:6px';
+    }
+    input?.focus();
+    return;
+  }
+
+  const studentName = document.getElementById('student_name')?.value || 'your child';
+  const schoolName  = document.getElementById('school_name')?.value  || 'the school';
+  const month       = document.getElementById('month')?.value        || 'this month';
+
+  const message = `🌾 *NutriPrint — Healthy Meal Plan*
+
+Namaskara! 🙏
+
+${studentName}'s personalised weekly meal plan for *${month}* from *${schoolName}* is ready.
+
+📋 *View full plan with recipes here:*
+${planUrl}
+
+The plan includes:
+✅ Balanced meals using local Karnataka foods
+✅ Serving sizes & nutrition values
+✅ Full recipes in English + Kannada
+✅ Under ₹50 per meal
+
+_Hang the plan on your kitchen wall and follow it daily for your child's healthy growth._
+
+— NutriPrint, Yenepoya Institute of Technology 🌱`;
+
+  const waUrl = `https://wa.me/91${number}?text=${encodeURIComponent(message)}`;
+  window.open(waUrl, '_blank');
+
+  // Show success
+  if (statusEl) {
+    statusEl.textContent = `✅ WhatsApp opened for +91 ${number}. Tap Send in WhatsApp!`;
+    statusEl.style.cssText = 'display:block;background:#D1FAE5;color:#065F46;font-size:12px;padding:8px 12px;border-radius:6px';
+  }
+
+  this.showToast(`WhatsApp opened for +91${number} 📱`);
+},
     const form = document.getElementById('generator-form');
     if (form) form.dispatchEvent(new Event('submit', { cancelable: true }));
   },
@@ -1196,10 +1414,10 @@ const app = {
       chip.onclick = () => { document.getElementById('ai-question-input').value = q; app.askAI(); };
       chipsEl.appendChild(chip);
     });
-    setTimeout(() => this.askAI(''), 300);
+    setTimeout(() => this.(''), 300);
   },
 
-  async askAI(customQuestion) {
+  async (customQuestion) {
     const panel = document.getElementById('ai-advisor-panel');
     if (!panel) return;
     const question   = customQuestion !== undefined ? customQuestion : (document.getElementById('ai-question-input')?.value?.trim() || '');
@@ -1216,8 +1434,29 @@ const app = {
       const data = await resp.json();
       if (thinkingEl) thinkingEl.style.display = 'none';
       if (replyBox) {
-        replyBox.innerHTML = `<div class="ai-reply-card"><div class="ai-reply-icon">🤖</div><div class="ai-reply-text">${(data.reply||'').replace(/\n/g,'<br>')}</div></div>`;
-      }
+  const replyId = `ai-reply-${Date.now()}`;
+  replyBox.innerHTML = `
+    <div class="ai-reply-card">
+      <div class="ai-reply-icon">🤖</div>
+      <div style="flex:1">
+        <div class="ai-reply-text" id="${replyId}">
+          ${(data.reply || '').replace(/\n/g, '<br>')}
+        </div>
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid #E2E8F0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:11px;color:#64748B">Add this advice to meal plan poster?</span>
+          <button onclick="app.addAIAdviceToPlanner('${replyId}')"
+            style="background:#1D9E75;color:white;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">
+            ✅ Yes, Add to Poster
+          </button>
+          <button onclick="this.parentElement.remove()"
+            style="background:#F1F5F9;color:#64748B;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">
+            ✕ No
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
       const input = document.getElementById('ai-question-input');
       if (input) input.value = '';
     } catch (err) {
