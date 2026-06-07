@@ -595,6 +595,13 @@ updatePosterWithAIAdvice() {
       <span>This opens WhatsApp with the plan link pre-filled. Teacher just taps Send.</span>
     </div>
   `;
+      regeneratePlan() {
+  // Clear AI advice notes when regenerating
+  this.aiAdviceNotes = [];
+  document.getElementById('poster-ai-advice')?.remove();
+  const form = document.getElementById('generator-form');
+  if (form) form.dispatchEvent(new Event('submit', { cancelable: true }));
+},
 
   // Insert after poster actions bar
   const actionsBar = document.querySelector('.poster-actions-bar');
