@@ -472,6 +472,15 @@ def debug_foods():
     conn.close()
     return jsonify(rows)
 
+@app.route('/api/debug-columns')
+def debug_columns():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM foods LIMIT 1")
+    row = cur.fetchone()
+    conn.close()
+    return jsonify(row)
+
 # ═══════════════════════════════════════════════════════════
 # PHASE 4 — AI ADVISOR (Groq)
 # ═══════════════════════════════════════════════════════════
