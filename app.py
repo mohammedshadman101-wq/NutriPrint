@@ -444,6 +444,9 @@ def get_nutrition_library():
             query += " AND is_veg = 1"
 
         foods = db_fetchall(conn, query, params)
+        print("FOODS COUNT:", len(foods))
+        print("FIRST FOOD:", foods[0] if foods else "NONE")
+
         return jsonify(foods)
 
     except Exception as e:
