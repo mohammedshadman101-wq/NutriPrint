@@ -1,5 +1,4 @@
 import os
-import sqlite3
 import json
 import uuid
 import hashlib
@@ -25,6 +24,44 @@ with app.app_context():
 
 groq_client = Groq(api_key=os.environ.get('GROQ_API_KEY'))
 
+# ── Helpers ───────────────────────────────────────────────
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def db_fetchone(conn, query, params=()):
+    """Execute query and fetch one row as dict."""
+    cur = conn.cursor()
+    cur.execute(query, params)
+    row = cur.fetchone()
+    if row is None:
+        return None
+    cols = [desc[0] for desc in cur.description]
+    return dict(zip(cols, row))
+
+def db_fetchall(conn, query, params=()):
+    """Execute query and fetch all rows as list of dicts."""
+    cur = conn.cursor()
+    cur.execute(query, params)
+    rows = cur.fetchall()
+    if not rows:
+        return []
+    cols = [desc[0] for desc in cur.description]
+    return [dict(zip(cols, row)) for row in rows]
+
+def db_execute(conn, query, params=()):
+    """Execute insert/update/delete query."""
+    cur = conn.cursor()
+    cur.execute(query, params)
+
+def get_current_teacher():
+    teacher_id = session.get('teacher_id')
+    if not teacher_id:
+        return None
+    conn = get_db_connection()
+    teacher = db_fetchone(conn, 'SELECT * FROM teachers WHERE id = %s', (teacher_id,))
+    conn.close()
+    return teacher
+
 # ── Static files ──────────────────────────────────────────
 @app.route('/')
 def index():
@@ -46,18 +83,14 @@ def serve_manifest():
 def serve_sw():
     return send_from_directory('.', 'sw.js')
 
-# ── Helpers ───────────────────────────────────────────────
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def get_current_teacher():
-    teacher_id = session.get('teacher_id')
-    if not teacher_id:
-        return None
-    conn = get_db_connection()
-    teacher = conn.execute('SELECT * FROM teachers WHERE id = ?', (teacher_id,)).fetchone()
-    conn.close()
-    return dict(teacher) if teacher else None
+# ── Init DB route (run once to seed) ─────────────────────
+@app.route('/init-db')
+def init_database():
+    try:
+        init_db()
+        return "Database seeded successfully! All foods loaded."
+    except Exception as e:
+        return f"Error: {str(e)}", 500
 
 # ═══════════════════════════════════════════════════════════
 # PHASE 1 — AUTH
@@ -65,11 +98,11 @@ def get_current_teacher():
 @app.route('/api/auth/signup', methods=['POST'])
 def signup():
     data = request.json or {}
-    name = data.get('name', '').strip()
+    name        = data.get('name', '').strip()
     school_name = data.get('school_name', '').strip()
-    district = data.get('district', '').strip()
-    phone = data.get('phone', '').strip()
-    password = data.get('password', '').strip()
+    district    = data.get('district', '').strip()
+    phone       = data.get('phone', '').strip()
+    password    = data.get('password', '').strip()
 
     if not all([name, school_name, district, phone, password]):
         return jsonify({'error': 'All fields are required.'}), 400
@@ -77,19 +110,20 @@ def signup():
         return jsonify({'error': 'Password must be at least 6 characters.'}), 400
 
     conn = get_db_connection()
-    existing = conn.execute('SELECT id FROM teachers WHERE phone = ?', (phone,)).fetchone()
-    if existing:
-        conn.close()
-        return jsonify({'error': 'Phone number already registered. Please login.'}), 400
+    try:
+        existing = db_fetchone(conn, 'SELECT id FROM teachers WHERE phone = %s', (phone,))
+        if existing:
+            return jsonify({'error': 'Phone number already registered. Please login.'}), 400
 
-    pw_hash = hash_password(password)
-    conn.execute(
-        'INSERT INTO teachers (name, school_name, district, phone, password_hash) VALUES (?, ?, ?, ?, ?)',
-        (name, school_name, district, phone, pw_hash)
-    )
-    conn.commit()
-    teacher = conn.execute('SELECT * FROM teachers WHERE phone = ?', (phone,)).fetchone()
-    conn.close()
+        pw_hash = hash_password(password)
+        db_execute(conn,
+            'INSERT INTO teachers (name, school_name, district, phone, password_hash) VALUES (%s, %s, %s, %s, %s)',
+            (name, school_name, district, phone, pw_hash)
+        )
+        conn.commit()
+        teacher = db_fetchone(conn, 'SELECT * FROM teachers WHERE phone = %s', (phone,))
+    finally:
+        conn.close()
 
     session['teacher_id'] = teacher['id']
     return jsonify({
@@ -103,16 +137,18 @@ def signup():
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    data = request.json or {}
-    phone = data.get('phone', '').strip()
+    data     = request.json or {}
+    phone    = data.get('phone', '').strip()
     password = data.get('password', '').strip()
 
     if not phone or not password:
         return jsonify({'error': 'Phone and password are required.'}), 400
 
     conn = get_db_connection()
-    teacher = conn.execute('SELECT * FROM teachers WHERE phone = ?', (phone,)).fetchone()
-    conn.close()
+    try:
+        teacher = db_fetchone(conn, 'SELECT * FROM teachers WHERE phone = %s', (phone,))
+    finally:
+        conn.close()
 
     if not teacher or teacher['password_hash'] != hash_password(password):
         return jsonify({'error': 'Invalid phone number or password.'}), 401
@@ -156,26 +192,28 @@ def get_students():
         return jsonify({'error': 'Not logged in'}), 401
 
     conn = get_db_connection()
-    students = conn.execute(
-        'SELECT * FROM students WHERE teacher_id = ? ORDER BY name', (teacher['id'],)
-    ).fetchall()
+    try:
+        students = db_fetchall(conn,
+            'SELECT * FROM students WHERE teacher_id = %s ORDER BY name',
+            (teacher['id'],)
+        )
+        result = []
+        for s in students:
+            bmi = db_fetchone(conn,
+                'SELECT * FROM bmi_records WHERE student_id = %s ORDER BY recorded_at DESC LIMIT 1',
+                (s['id'],)
+            )
+            s['latest_bmi'] = bmi
 
-    result = []
-    for s in students:
-        s = dict(s)
-        bmi = conn.execute(
-            'SELECT * FROM bmi_records WHERE student_id = ? ORDER BY recorded_at DESC LIMIT 1',
-            (s['id'],)
-        ).fetchone()
-        s['latest_bmi'] = dict(bmi) if bmi else None
-        history = conn.execute(
-            'SELECT bmi, status, recorded_at FROM bmi_records WHERE student_id = ? ORDER BY recorded_at',
-            (s['id'],)
-        ).fetchall()
-        s['bmi_history'] = [dict(h) for h in history]
-        result.append(s)
+            history = db_fetchall(conn,
+                'SELECT bmi, status, recorded_at FROM bmi_records WHERE student_id = %s ORDER BY recorded_at',
+                (s['id'],)
+            )
+            s['bmi_history'] = history
+            result.append(s)
+    finally:
+        conn.close()
 
-    conn.close()
     return jsonify(result)
 
 @app.route('/api/students', methods=['POST'])
@@ -184,26 +222,29 @@ def add_student():
     if not teacher:
         return jsonify({'error': 'Not logged in'}), 401
 
-    data = request.json or {}
-    name = data.get('name', '').strip()
-    age = data.get('age', 10)
+    data   = request.json or {}
+    name   = data.get('name', '').strip()
+    age    = data.get('age', 10)
     gender = data.get('gender', 'Boy')
 
     if not name:
         return jsonify({'error': 'Student name is required'}), 400
 
     conn = get_db_connection()
-    conn.execute(
-        'INSERT INTO students (teacher_id, name, age, gender) VALUES (?, ?, ?, ?)',
-        (teacher['id'], name, age, gender)
-    )
-    conn.commit()
-    student = conn.execute(
-        'SELECT * FROM students WHERE teacher_id = ? AND name = ? ORDER BY id DESC LIMIT 1',
-        (teacher['id'], name)
-    ).fetchone()
-    conn.close()
-    return jsonify(dict(student))
+    try:
+        db_execute(conn,
+            'INSERT INTO students (teacher_id, name, age, gender) VALUES (%s, %s, %s, %s)',
+            (teacher['id'], name, age, gender)
+        )
+        conn.commit()
+        student = db_fetchone(conn,
+            'SELECT * FROM students WHERE teacher_id = %s AND name = %s ORDER BY id DESC LIMIT 1',
+            (teacher['id'], name)
+        )
+    finally:
+        conn.close()
+
+    return jsonify(student)
 
 @app.route('/api/students/<int:student_id>/bmi', methods=['POST'])
 def save_bmi(student_id):
@@ -213,12 +254,15 @@ def save_bmi(student_id):
 
     data = request.json or {}
     conn = get_db_connection()
-    conn.execute(
-        'INSERT INTO bmi_records (student_id, height, weight, bmi, status) VALUES (?, ?, ?, ?, ?)',
-        (student_id, data.get('height'), data.get('weight'), data.get('bmi'), data.get('status'))
-    )
-    conn.commit()
-    conn.close()
+    try:
+        db_execute(conn,
+            'INSERT INTO bmi_records (student_id, height, weight, bmi, status) VALUES (%s, %s, %s, %s, %s)',
+            (student_id, data.get('height'), data.get('weight'), data.get('bmi'), data.get('status'))
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
     return jsonify({'success': True})
 
 @app.route('/api/students/<int:student_id>', methods=['DELETE'])
@@ -228,10 +272,14 @@ def delete_student(student_id):
         return jsonify({'error': 'Not logged in'}), 401
 
     conn = get_db_connection()
-    conn.execute('DELETE FROM bmi_records WHERE student_id = ?', (student_id,))
-    conn.execute('DELETE FROM students WHERE id = ? AND teacher_id = ?', (student_id, teacher['id']))
-    conn.commit()
-    conn.close()
+    try:
+        db_execute(conn, 'DELETE FROM bmi_records WHERE student_id = %s', (student_id,))
+        db_execute(conn, 'DELETE FROM students WHERE id = %s AND teacher_id = %s',
+                   (student_id, teacher['id']))
+        conn.commit()
+    finally:
+        conn.close()
+
     return jsonify({'success': True})
 
 # ═══════════════════════════════════════════════════════════
@@ -243,20 +291,20 @@ def generate_plan():
 
     teacher = get_current_teacher()
     if teacher:
-        school_name = data.get('school_name') or teacher['school_name']
+        school_name  = data.get('school_name')  or teacher['school_name']
         teacher_name = data.get('teacher_name') or teacher['name']
     else:
-        school_name = data.get('school_name', '').strip()
+        school_name  = data.get('school_name', '').strip()
         teacher_name = data.get('teacher_name', '').strip()
 
-    student_name = data.get('student_name', '').strip()
-    bmi_status = data.get('bmi_status', '').strip()
+    student_name          = data.get('student_name', '').strip()
+    bmi_status            = data.get('bmi_status', '').strip()
     optimization_strategy = data.get('optimization_strategy', 'standard').strip()
-    age_group = data.get('age_group', '9-12')
-    preference = data.get('preference', 'Vegetarian')
-    region = data.get('region', 'All')
-    month = data.get('month', 'June')
-    student_id = data.get('student_id')
+    age_group             = data.get('age_group', '9-12')
+    preference            = data.get('preference', 'Vegetarian')
+    region                = data.get('region', 'All')
+    month                 = data.get('month', 'June')
+    student_id            = data.get('student_id')
 
     if not school_name:
         return jsonify({"error": "School name is required."}), 400
@@ -272,29 +320,32 @@ def generate_plan():
         )
 
         qr_code = str(uuid.uuid4())[:8].upper()
+
         if teacher:
             conn = get_db_connection()
-            conn.execute('''
-                INSERT INTO saved_plans
-                (qr_code, teacher_id, student_id, plan_data, school_name, teacher_name,
-                 student_name, bmi_status, age_group, preference, region, month)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                qr_code, teacher['id'], student_id, json.dumps(plan),
-                school_name, teacher_name, student_name, bmi_status,
-                age_group, preference, region, month
-            ))
-            if student_id and bmi_status and data.get('bmi_value'):
-                conn.execute(
-                    'INSERT INTO bmi_records (student_id, height, weight, bmi, status) VALUES (?, ?, ?, ?, ?)',
-                    (student_id, data.get('height', 0), data.get('weight', 0),
-                     data.get('bmi_value', 0), bmi_status)
-                )
-            conn.commit()
-            conn.close()
+            try:
+                db_execute(conn, '''
+                    INSERT INTO saved_plans
+                    (qr_code, teacher_id, student_id, plan_data, school_name, teacher_name,
+                     student_name, bmi_status, age_group, preference, region, month)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ''', (
+                    qr_code, teacher['id'], student_id, json.dumps(plan),
+                    school_name, teacher_name, student_name, bmi_status,
+                    age_group, preference, region, month
+                ))
+                if student_id and bmi_status and data.get('bmi_value'):
+                    db_execute(conn,
+                        'INSERT INTO bmi_records (student_id, height, weight, bmi, status) VALUES (%s, %s, %s, %s, %s)',
+                        (student_id, data.get('height', 0), data.get('weight', 0),
+                         data.get('bmi_value', 0), bmi_status)
+                    )
+                conn.commit()
+            finally:
+                conn.close()
 
         plan['qr_code'] = qr_code
-        plan['qr_url'] = f"/plan/{qr_code}"
+        plan['qr_url']  = f"/plan/{qr_code}"
         return jsonify(plan)
 
     except Exception as e:
@@ -309,39 +360,39 @@ def view_plan(qr_code):
 @app.route('/api/plan/<qr_code>', methods=['GET'])
 def get_plan(qr_code):
     conn = get_db_connection()
-    plan_row = conn.execute('SELECT * FROM saved_plans WHERE qr_code = ?', (qr_code,)).fetchone()
-    conn.close()
+    try:
+        plan_row = db_fetchone(conn,
+            'SELECT * FROM saved_plans WHERE qr_code = %s', (qr_code,)
+        )
+        if not plan_row:
+            return jsonify({'error': 'Plan not found'}), 404
 
-    if not plan_row:
-        return jsonify({'error': 'Plan not found'}), 404
-
-    plan_row = dict(plan_row)
-    plan_data = json.loads(plan_row['plan_data'])
-
-    conn = get_db_connection()
-    foods = {row['name_en']: dict(row) for row in conn.execute('SELECT * FROM foods').fetchall()}
-    conn.close()
+        plan_data = json.loads(plan_row['plan_data'])
+        foods_list = db_fetchall(conn, 'SELECT * FROM foods')
+        foods = {row['name_en']: row for row in foods_list}
+    finally:
+        conn.close()
 
     for day, day_data in plan_data.get('meal_plan', {}).items():
         for slot in ['breakfast', 'lunch', 'snack', 'dinner']:
             food = day_data.get(slot)
             if food and food.get('name_en') in foods:
-                full_food = foods[food['name_en']]
-                food['ingredients'] = full_food.get('ingredients', '')
-                food['recipe_steps'] = full_food.get('recipe_steps', '')
-                food['serving_size'] = full_food.get('serving_size', '1 portion')
+                full = foods[food['name_en']]
+                food['ingredients']  = full.get('ingredients', '')
+                food['recipe_steps'] = full.get('recipe_steps', '')
+                food['serving_size'] = full.get('serving_size', '1 portion')
 
     return jsonify({
-        'qr_code': qr_code,
-        'school_name': plan_row['school_name'],
+        'qr_code':      qr_code,
+        'school_name':  plan_row['school_name'],
         'teacher_name': plan_row['teacher_name'],
         'student_name': plan_row['student_name'],
-        'bmi_status': plan_row['bmi_status'],
-        'region': plan_row['region'],
-        'preference': plan_row['preference'],
-        'month': plan_row['month'],
-        'created_at': plan_row['created_at'],
-        'plan_data': plan_data
+        'bmi_status':   plan_row['bmi_status'],
+        'region':       plan_row['region'],
+        'preference':   plan_row['preference'],
+        'month':        plan_row['month'],
+        'created_at':   str(plan_row['created_at']),
+        'plan_data':    plan_data
     })
 
 @app.route('/api/saved-plans', methods=['GET'])
@@ -351,12 +402,20 @@ def get_saved_plans():
         return jsonify([])
 
     conn = get_db_connection()
-    plans = conn.execute(
-        'SELECT id, qr_code, student_name, school_name, month, preference, region, created_at FROM saved_plans WHERE teacher_id = ? ORDER BY created_at DESC LIMIT 20',
-        (teacher['id'],)
-    ).fetchall()
-    conn.close()
-    return jsonify([dict(p) for p in plans])
+    try:
+        plans = db_fetchall(conn,
+            'SELECT id, qr_code, student_name, school_name, month, preference, region, created_at FROM saved_plans WHERE teacher_id = %s ORDER BY created_at DESC LIMIT 20',
+            (teacher['id'],)
+        )
+    finally:
+        conn.close()
+
+    # Convert datetime to string for JSON
+    for p in plans:
+        if p.get('created_at'):
+            p['created_at'] = str(p['created_at'])
+
+    return jsonify(plans)
 
 # ═══════════════════════════════════════════════════════════
 # NUTRITION LIBRARY
@@ -364,26 +423,27 @@ def get_saved_plans():
 @app.route('/api/nutrition', methods=['GET'])
 def get_nutrition_library():
     search_query = request.args.get('search', '').strip()
-    category = request.args.get('category', '').strip()
-    veg_only = request.args.get('veg_only', 'false').lower() == 'true'
+    category     = request.args.get('category', '').strip()
+    veg_only     = request.args.get('veg_only', 'false').lower() == 'true'
 
     conn = get_db_connection()
-    query = "SELECT * FROM foods WHERE 1=1"
-    params = []
-
-    if search_query:
-        query += " AND (name_en LIKE ? OR name_kn LIKE ?)"
-        like = f"%{search_query}%"
-        params.extend([like, like])
-    if category:
-        query += " AND category = ?"
-        params.append(category)
-    if veg_only:
-        query += " AND is_veg = 1"
-
     try:
-        foods = [dict(row) for row in conn.execute(query, params).fetchall()]
+        query  = "SELECT * FROM foods WHERE 1=1"
+        params = []
+
+        if search_query:
+            query += " AND (name_en ILIKE %s OR name_kn ILIKE %s)"
+            like = f"%{search_query}%"
+            params.extend([like, like])
+        if category:
+            query += " AND category = %s"
+            params.append(category)
+        if veg_only:
+            query += " AND is_veg = 1"
+
+        foods = db_fetchall(conn, query, params)
         return jsonify(foods)
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
@@ -392,26 +452,29 @@ def get_nutrition_library():
 @app.route('/api/recipe/<int:food_id>', methods=['GET'])
 def get_recipe(food_id):
     conn = get_db_connection()
-    food = conn.execute('SELECT * FROM foods WHERE id = ?', (food_id,)).fetchone()
-    conn.close()
+    try:
+        food = db_fetchone(conn, 'SELECT * FROM foods WHERE id = %s', (food_id,))
+    finally:
+        conn.close()
+
     if not food:
         return jsonify({'error': 'Not found'}), 404
-    return jsonify(dict(food))
+    return jsonify(food)
 
 # ═══════════════════════════════════════════════════════════
 # PHASE 4 — AI ADVISOR (Groq)
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/ai-advisor', methods=['POST'])
 def ai_advisor():
-    data = request.json or {}
+    data         = request.json or {}
     student_name = data.get('student_name', 'the student')
-    age = data.get('age', 10)
-    gender = data.get('gender', 'Boy')
-    bmi_status = data.get('bmi_status', 'Normal')
-    bmi_value = data.get('bmi_value', '')
-    preference = data.get('preference', 'Vegetarian')
-    region = data.get('region', 'Karnataka')
-    question = data.get('question', '').strip()
+    age          = data.get('age', 10)
+    gender       = data.get('gender', 'Boy')
+    bmi_status   = data.get('bmi_status', 'Normal')
+    bmi_value    = data.get('bmi_value', '')
+    preference   = data.get('preference', 'Vegetarian')
+    region       = data.get('region', 'Karnataka')
+    question     = data.get('question', '').strip()
 
     try:
         prompt = f"""You are NutriPrint AI, a friendly school nutrition advisor for Karnataka, India.
