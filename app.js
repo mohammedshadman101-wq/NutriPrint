@@ -1,12 +1,6 @@
 // ============================================================
-// NutriPrint — app.js  (UPDATED — All 7 Phases)
-// Phase 1: Login / Signup
-// Phase 2: Class Dashboard
-// Phase 3: Auto-fill from BMI to Planner
-// Phase 4: QR Code + Recipes
-// Phase 5: PWA Offline
-// Phase 6: Voice Input
-// + All previous 4 fixes preserved
+// NutriPrint — app.js
+// All features + Weekly Progress Tracker (BMI Growth Chart)
 // ============================================================
 
 const FOOD_EMOJIS = {
@@ -57,30 +51,117 @@ function getSectionKeyFromHash() {
 // ============================================================
 const app = {
 
-  currentSection: 'home',
-  lastPlanData:   null,
-  lastBMIData:    null,
-  currentTeacher: null,
-  students:       [],
-  voiceListening: false,
+  currentSection:  'home',
+  lastPlanData:    null,
+  lastBMIData:     null,
+  currentTeacher:  null,
+  students:        [],
+  bulkPlanResults: [],
+  addAIAdviceToPlanner(replyId) {
+  const replyEl = document.getElementById(replyId);
+  const text    = replyEl ? replyEl.innerText.trim() : '';
 
-  // ── Init ────────────────────────────────────────────────
+  if (!text) {
+    this.showToast('No advice to add.');
+    return;
+  }
+
+  // Store AI advice list
+  if (!this.aiAdviceNotes) this.aiAdviceNotes = [];
+  this.aiAdviceNotes.push(text);
+
+  // Update the poster footer with AI advice
+  this.updatePosterWithAIAdvice();
+
+  // Hide the Yes/No buttons
+  replyEl?.parentElement?.querySelector('[onclick*="addAIAdviceToPlanner"]')
+    ?.parentElement?.remove();
+
+  // Show confirmation on the reply card
+  replyEl?.insertAdjacentHTML('afterend', `
+    <div style="margin-top:8px;background:#D1FAE5;border-radius:6px;padding:6px 10px;font-size:11px;color:#065F46;font-weight:700">
+      ✅ Added to meal plan poster!
+    </div>
+  `);
+
+  this.showToast('AI advice added to poster! 📋');
+
+  // If generator section is not active, prompt to view
+  if (this.currentSection !== 'generator') {
+    setTimeout(() => {
+      if (confirm('AI advice added! Go to Meal Planner to see it on the poster?')) {
+        this.navigateTo('generator');
+      }
+    }, 500);
+  }
+},
+
+updatePosterWithAIAdvice() {
+  if (!this.aiAdviceNotes?.length) return;
+
+  // Find or create the AI advice box inside the poster
+  let adviceBox = document.getElementById('poster-ai-advice');
+
+  if (!adviceBox) {
+    // Create new box and insert before poster footer
+    adviceBox = document.createElement('div');
+    adviceBox.id = 'poster-ai-advice';
+    adviceBox.style.cssText = `
+      margin: 10px 0;
+      background: linear-gradient(135deg, #F0FDF9, #ECFDF5);
+      border: 1.5px solid #1D9E75;
+      border-radius: 8px;
+      padding: 10px 14px;
+    `;
+
+    // Insert before poster footer
+    const posterFooter = document.querySelector('.poster-footer');
+    if (posterFooter) {
+      posterFooter.insertAdjacentElement('beforebegin', adviceBox);
+    } else {
+      // Fallback — append to poster
+      const poster = document.getElementById('printable-poster');
+      if (poster) poster.appendChild(adviceBox);
+    }
+  }
+
+  // Build the content
+  adviceBox.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="font-size:14px">🤖</span>
+      <strong style="font-size:10px;color:#1D9E75;text-transform:uppercase;letter-spacing:0.5px">
+        AI Nutrition Advisor Notes
+      </strong>
+      <span style="font-size:9px;color:#64748B;margin-left:auto">Powered by Groq AI</span>
+    </div>
+    ${this.aiAdviceNotes.map((note, i) => `
+      <div style="display:flex;gap:8px;margin-bottom:${i < this.aiAdviceNotes.length-1 ? '8px' : '0'};padding-bottom:${i < this.aiAdviceNotes.length-1 ? '8px' : '0'};${i < this.aiAdviceNotes.length-1 ? 'border-bottom:1px solid #BBF7D0' : ''}">
+        <span style="background:#1D9E75;color:white;width:16px;height:16px;border-radius:50%;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${i+1}</span>
+        <p style="font-size:9px;color:#334155;line-height:1.5;margin:0">${note}</p>
+      </div>
+    `).join('')}
+    <div style="margin-top:8px;font-size:8px;color:#94A3B8;border-top:1px solid #BBF7D0;padding-top:6px">
+      💡 These notes are AI-generated suggestions. Consult a doctor for medical advice.
+    </div>
+  `;
+
+  // Also clear AI advice when regenerating
+  // (already handled since renderPoster rebuilds the poster)
+},
+
+  // ── Init ──────────────────────────────────────────────────
   async init() {
     this.setupNavigation();
     this.setupHashRouting();
     this.animateStats();
     this.loadLibrary();
     this.setupMobileMenu();
-    this.registerServiceWorker();
-
-    // Check if already logged in
     await this.checkAuthStatus();
-
     const initialKey = getSectionKeyFromHash();
     this.showSection(initialKey, false);
   },
 
-  // ── Hash Routing ─────────────────────────────────────────
+  // ── Hash Routing ──────────────────────────────────────────
   setupHashRouting() {
     window.addEventListener('popstate', () => {
       const key = getSectionKeyFromHash();
@@ -88,7 +169,7 @@ const app = {
     });
   },
 
-  // ── Navigation ───────────────────────────────────────────
+  // ── Navigation ────────────────────────────────────────────
   setupNavigation() {
     document.querySelectorAll('.nav-link').forEach(link => {
       link.addEventListener('click', (e) => {
@@ -131,14 +212,14 @@ const app = {
     if (sectionKey === 'dashboard') this.loadDashboard();
   },
 
-  // ── Mobile Menu ──────────────────────────────────────────
+  // ── Mobile Menu ───────────────────────────────────────────
   setupMobileMenu() {
     const btn = document.getElementById('menu-toggle');
     const nav = document.getElementById('nav-links');
     if (btn && nav) btn.addEventListener('click', () => nav.classList.toggle('open'));
   },
 
-  // ── Stats ────────────────────────────────────────────────
+  // ── Stats ─────────────────────────────────────────────────
   animateStats() {
     const targets = {
       'stat-junk-india': 93,
@@ -159,9 +240,7 @@ const app = {
     });
   },
 
-  // ════════════════════════════════════════════════════════
-  // PHASE 1 — LOGIN / SIGNUP
-  // ════════════════════════════════════════════════════════
+  // ── Auth ──────────────────────────────────────────────────
   async checkAuthStatus() {
     try {
       const resp = await fetch('/api/auth/me', { credentials: 'include' });
@@ -170,6 +249,8 @@ const app = {
         this.currentTeacher = data.teacher;
         this.updateNavForLoggedIn();
         this.autoFillTeacherDetails();
+      } else {
+        this.updateNavForLoggedIn();
       }
     } catch (e) {
       console.log('Auth check failed:', e);
@@ -177,26 +258,40 @@ const app = {
   },
 
   updateNavForLoggedIn() {
-    // Add teacher name to nav
     const nav = document.getElementById('nav-links');
     if (!nav) return;
-
-    // Remove existing auth buttons
     nav.querySelectorAll('.nav-auth-btn').forEach(el => el.remove());
-
     if (this.currentTeacher) {
       nav.insertAdjacentHTML('beforeend', `
-        <div class="nav-teacher-info nav-auth-btn">
-          <span class="nav-teacher-name">👨‍🏫 ${this.currentTeacher.name}</span>
-          <button class="nav-logout-btn" onclick="app.logout()">Logout</button>
-        </div>
+        <li class="nav-auth-btn">
+          <div class="nav-teacher-info">
+            <span class="nav-teacher-name">👨‍🏫 ${this.currentTeacher.name}</span>
+            <button class="nav-logout-btn" onclick="app.logout()">Logout</button>
+          </div>
+        </li>
       `);
     } else {
       nav.insertAdjacentHTML('beforeend', `
-        <button class="nav-login-btn nav-auth-btn" onclick="app.showAuthModal('login')">
-          Login
-        </button>
+        <li class="nav-auth-btn">
+          <button class="nav-login-btn" onclick="app.showAuthModal('login')">👨‍🏫 Login</button>
+        </li>
       `);
+    }
+  },
+
+  autoFillTeacherDetails() {
+    if (!this.currentTeacher) return;
+    const schoolEl  = document.getElementById('school_name');
+    const teacherEl = document.getElementById('teacher_name');
+    if (schoolEl  && !schoolEl.value)  schoolEl.value  = this.currentTeacher.school_name;
+    if (teacherEl && !teacherEl.value) teacherEl.value = this.currentTeacher.name;
+    const banner = document.getElementById('teacher-welcome-banner');
+    if (banner) {
+      banner.style.display = 'flex';
+      banner.innerHTML = `
+        <span>👨‍🏫 Logged in as <strong>${this.currentTeacher.name}</strong> — ${this.currentTeacher.school_name}</span>
+        <button onclick="app.navigateTo('dashboard')" class="banner-dash-btn">My Dashboard →</button>
+      `;
     }
   },
 
@@ -208,7 +303,6 @@ const app = {
       modal.className = 'auth-modal-overlay';
       document.body.appendChild(modal);
     }
-
     modal.innerHTML = `
       <div class="auth-modal-box">
         <button class="auth-modal-close" onclick="document.getElementById('auth-modal').style.display='none'">✕</button>
@@ -217,72 +311,36 @@ const app = {
           <h2>NutriPrint</h2>
           <p>Karnataka School Nutrition Platform</p>
         </div>
-
         <div class="auth-tabs">
-          <button class="auth-tab ${mode === 'login' ? 'active' : ''}"
-            onclick="app.switchAuthTab('login')">Login</button>
-          <button class="auth-tab ${mode === 'signup' ? 'active' : ''}"
-            onclick="app.switchAuthTab('signup')">Sign Up</button>
+          <button class="auth-tab ${mode==='login'?'active':''}" onclick="app.switchAuthTab('login')">Login</button>
+          <button class="auth-tab ${mode==='signup'?'active':''}" onclick="app.switchAuthTab('signup')">Sign Up</button>
         </div>
-
-        <!-- LOGIN FORM -->
-        <div id="auth-login-form" style="display:${mode === 'login' ? 'block' : 'none'}">
-          <div class="auth-field">
-            <label>Phone Number</label>
-            <input type="tel" id="login-phone" placeholder="Enter your phone number">
-          </div>
-          <div class="auth-field">
-            <label>Password</label>
-            <input type="password" id="login-password" placeholder="Enter password">
-          </div>
+        <div id="auth-login-form" style="display:${mode==='login'?'block':'none'}">
+          <div class="auth-field"><label>Phone Number</label><input type="tel" id="login-phone" placeholder="Enter your phone number"></div>
+          <div class="auth-field"><label>Password</label><input type="password" id="login-password" placeholder="Enter password"></div>
           <div class="auth-error" id="login-error" style="display:none"></div>
           <button class="auth-submit-btn" onclick="app.login()">Login →</button>
-          <p class="auth-switch">Don't have an account?
-            <a href="#" onclick="app.switchAuthTab('signup')">Sign up here</a>
-          </p>
+          <p class="auth-switch">Don't have an account? <a href="#" onclick="app.switchAuthTab('signup')">Sign up here</a></p>
         </div>
-
-        <!-- SIGNUP FORM -->
-        <div id="auth-signup-form" style="display:${mode === 'signup' ? 'block' : 'none'}">
-          <div class="auth-field">
-            <label>Your Full Name</label>
-            <input type="text" id="signup-name" placeholder="e.g. Smt. Kavitha Rao">
-          </div>
-          <div class="auth-field">
-            <label>School Name</label>
-            <input type="text" id="signup-school" placeholder="e.g. Govt. High School Mangalore">
-          </div>
-          <div class="auth-field">
-            <label>District</label>
+        <div id="auth-signup-form" style="display:${mode==='signup'?'block':'none'}">
+          <div class="auth-field"><label>Your Full Name</label><input type="text" id="signup-name" placeholder="e.g. Smt. Kavitha Rao"></div>
+          <div class="auth-field"><label>School Name</label><input type="text" id="signup-school" placeholder="e.g. Govt. High School Mangalore"></div>
+          <div class="auth-field"><label>District</label>
             <select id="signup-district">
               <option value="">Select District</option>
-              <option>Dakshina Kannada</option>
-              <option>Udupi</option>
-              <option>Mangalore</option>
-              <option>Shivamogga</option>
-              <option>Bengaluru Rural</option>
-              <option>Hassan</option>
-              <option>Mysuru</option>
-              <option>Other</option>
+              <option>Dakshina Kannada</option><option>Udupi</option><option>Mangalore</option>
+              <option>Shivamogga</option><option>Bengaluru Rural</option><option>Hassan</option>
+              <option>Mysuru</option><option>Other</option>
             </select>
           </div>
-          <div class="auth-field">
-            <label>Phone Number</label>
-            <input type="tel" id="signup-phone" placeholder="10-digit mobile number">
-          </div>
-          <div class="auth-field">
-            <label>Password</label>
-            <input type="password" id="signup-password" placeholder="Minimum 6 characters">
-          </div>
+          <div class="auth-field"><label>Phone Number</label><input type="tel" id="signup-phone" placeholder="10-digit mobile number"></div>
+          <div class="auth-field"><label>Password</label><input type="password" id="signup-password" placeholder="Minimum 6 characters"></div>
           <div class="auth-error" id="signup-error" style="display:none"></div>
           <button class="auth-submit-btn" onclick="app.signup()">Create Account →</button>
-          <p class="auth-switch">Already registered?
-            <a href="#" onclick="app.switchAuthTab('login')">Login here</a>
-          </p>
+          <p class="auth-switch">Already registered? <a href="#" onclick="app.switchAuthTab('login')">Login here</a></p>
         </div>
       </div>
     `;
-
     modal.style.display = 'flex';
   },
 
@@ -290,7 +348,7 @@ const app = {
     document.getElementById('auth-login-form').style.display  = mode === 'login'  ? 'block' : 'none';
     document.getElementById('auth-signup-form').style.display = mode === 'signup' ? 'block' : 'none';
     document.querySelectorAll('.auth-tab').forEach((tab, i) => {
-      tab.classList.toggle('active', (i === 0 && mode === 'login') || (i === 1 && mode === 'signup'));
+      tab.classList.toggle('active', (i===0&&mode==='login')||(i===1&&mode==='signup'));
     });
   },
 
@@ -298,38 +356,20 @@ const app = {
     const phone    = document.getElementById('login-phone').value.trim();
     const password = document.getElementById('login-password').value.trim();
     const errEl    = document.getElementById('login-error');
-
-    if (!phone || !password) {
-      errEl.textContent = 'Please enter phone and password.';
-      errEl.style.display = 'block';
-      return;
-    }
-
+    if (!phone || !password) { errEl.textContent = 'Please enter phone and password.'; errEl.style.display = 'block'; return; }
     try {
       const resp = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({ phone, password }),
       });
       const data = await resp.json();
-
-      if (!resp.ok) {
-        errEl.textContent = data.error || 'Login failed.';
-        errEl.style.display = 'block';
-        return;
-      }
-
+      if (!resp.ok) { errEl.textContent = data.error || 'Login failed.'; errEl.style.display = 'block'; return; }
       this.currentTeacher = data.teacher;
       document.getElementById('auth-modal').style.display = 'none';
       this.updateNavForLoggedIn();
       this.autoFillTeacherDetails();
       this.showToast(`Welcome back, ${data.teacher.name}! 🎉`);
-
-    } catch (e) {
-      errEl.textContent = 'Connection error. Please try again.';
-      errEl.style.display = 'block';
-    }
+    } catch (e) { errEl.textContent = 'Connection error.'; errEl.style.display = 'block'; }
   },
 
   async signup() {
@@ -339,38 +379,20 @@ const app = {
     const phone    = document.getElementById('signup-phone').value.trim();
     const password = document.getElementById('signup-password').value.trim();
     const errEl    = document.getElementById('signup-error');
-
-    if (!name || !school || !district || !phone || !password) {
-      errEl.textContent = 'Please fill all fields.';
-      errEl.style.display = 'block';
-      return;
-    }
-
+    if (!name||!school||!district||!phone||!password) { errEl.textContent = 'Please fill all fields.'; errEl.style.display = 'block'; return; }
     try {
       const resp = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({ name, school_name: school, district, phone, password }),
       });
       const data = await resp.json();
-
-      if (!resp.ok) {
-        errEl.textContent = data.error || 'Signup failed.';
-        errEl.style.display = 'block';
-        return;
-      }
-
+      if (!resp.ok) { errEl.textContent = data.error || 'Signup failed.'; errEl.style.display = 'block'; return; }
       this.currentTeacher = data.teacher;
       document.getElementById('auth-modal').style.display = 'none';
       this.updateNavForLoggedIn();
       this.autoFillTeacherDetails();
       this.showToast(`Account created! Welcome, ${data.teacher.name}! 🌾`);
-
-    } catch (e) {
-      errEl.textContent = 'Connection error. Please try again.';
-      errEl.style.display = 'block';
-    }
+    } catch (e) { errEl.textContent = 'Connection error.'; errEl.style.display = 'block'; }
   },
 
   async logout() {
@@ -381,311 +403,18 @@ const app = {
     this.navigateTo('home');
   },
 
-  // PHASE 1 — Auto-fill teacher details everywhere
-  autoFillTeacherDetails() {
-    if (!this.currentTeacher) return;
-
-    const schoolEl  = document.getElementById('school_name');
-    const teacherEl = document.getElementById('teacher_name');
-
-    if (schoolEl  && !schoolEl.value)  schoolEl.value  = this.currentTeacher.school_name;
-    if (teacherEl && !teacherEl.value) teacherEl.value = this.currentTeacher.name;
-
-    // Show welcome banner if exists
-    const banner = document.getElementById('teacher-welcome-banner');
-    if (banner) {
-      banner.style.display = 'flex';
-      banner.innerHTML = `
-        <span>👨‍🏫 Logged in as <strong>${this.currentTeacher.name}</strong>
-        — ${this.currentTeacher.school_name}</span>
-        <button onclick="app.navigateTo('dashboard')" class="banner-dash-btn">
-          My Dashboard →
-        </button>
-      `;
-    }
-  },
-
-  // ════════════════════════════════════════════════════════
-  // PHASE 2 — CLASS DASHBOARD
-  // ════════════════════════════════════════════════════════
-  async loadDashboard() {
-    if (!this.currentTeacher) {
-      this.showAuthModal('login');
-      return;
-    }
-
-    const container = document.getElementById('dashboard-section');
-    if (!container) return;
-
-    container.innerHTML = `
-      <div class="dashboard-wrapper">
-        <div class="dashboard-header">
-          <div>
-            <h2>My Class Dashboard</h2>
-            <p>${this.currentTeacher.school_name} • ${this.currentTeacher.district}</p>
-          </div>
-          <button class="add-student-btn" onclick="app.showAddStudentModal()">
-            + Add Student
-          </button>
-        </div>
-        <div id="dashboard-stats" class="dashboard-stats"></div>
-        <div id="students-grid" class="students-grid">
-          <div class="loading-spinner">Loading students...</div>
-        </div>
-      </div>
-    `;
-
-    try {
-      const resp = await fetch('/api/students', { credentials: 'include' });
-      const students = await resp.json();
-      this.students = students;
-      this.renderStudentsGrid(students);
-      this.renderDashboardStats(students);
-    } catch (e) {
-      document.getElementById('students-grid').innerHTML =
-        '<p style="color:#EF4444;text-align:center">Error loading students.</p>';
-    }
-  },
-
-  renderDashboardStats(students) {
-    const el = document.getElementById('dashboard-stats');
-    if (!el) return;
-
-    const total       = students.length;
-    const underweight = students.filter(s => s.latest_bmi?.status === 'Underweight').length;
-    const normal      = students.filter(s => s.latest_bmi?.status === 'Normal').length;
-    const overweight  = students.filter(s =>
-      s.latest_bmi?.status === 'Overweight' || s.latest_bmi?.status === 'Obese').length;
-
-    el.innerHTML = `
-      <div class="stat-card total-card">
-        <div class="stat-num">${total}</div>
-        <div class="stat-label">Total Students</div>
-      </div>
-      <div class="stat-card normal-card">
-        <div class="stat-num">${normal}</div>
-        <div class="stat-label">✅ Normal BMI</div>
-      </div>
-      <div class="stat-card under-card">
-        <div class="stat-num">${underweight}</div>
-        <div class="stat-label">⚠️ Underweight</div>
-      </div>
-      <div class="stat-card over-card">
-        <div class="stat-num">${overweight}</div>
-        <div class="stat-label">🔴 Overweight</div>
-      </div>
-    `;
-  },
-
-  renderStudentsGrid(students) {
-    const grid = document.getElementById('students-grid');
-    if (!grid) return;
-
-    if (!students.length) {
-      grid.innerHTML = `
-        <div class="empty-students">
-          <div style="font-size:48px">👩‍🎓</div>
-          <p>No students added yet.</p>
-          <button class="add-student-btn" onclick="app.showAddStudentModal()">
-            + Add First Student
-          </button>
-        </div>
-      `;
-      return;
-    }
-
-    grid.innerHTML = students.map(s => {
-      const bmi    = s.latest_bmi;
-      const status = bmi ? bmi.status : 'Not measured';
-      const color  = status === 'Normal' ? '#10B981'
-        : status === 'Underweight'       ? '#F59E0B'
-        : status === 'Overweight' || status === 'Obese' ? '#EF4444'
-        : '#94A3B8';
-
-      // Mini BMI history sparkline
-      const history = s.bmi_history || [];
-      const sparkline = history.length > 1
-        ? this.renderSparkline(history.map(h => h.bmi))
-        : '';
-
-      return `
-        <div class="student-card">
-          <div class="student-card-top">
-            <div class="student-avatar">${s.gender === 'Girl' ? '👧' : '👦'}</div>
-            <div class="student-info">
-              <h4>${s.name}</h4>
-              <p>Age: ${s.age} • ${s.gender}</p>
-            </div>
-            <button class="student-delete-btn"
-              onclick="app.deleteStudent(${s.id}, '${s.name}')">🗑️</button>
-          </div>
-
-          <div class="student-bmi-row">
-            <span class="bmi-status-tag" style="background:${color}20;color:${color}">
-              ${status}
-            </span>
-            ${bmi ? `<span class="bmi-value-tag">BMI: ${bmi.bmi}</span>` : ''}
-          </div>
-
-          ${sparkline ? `
-            <div class="sparkline-label">BMI Progress</div>
-            <div class="sparkline-container">${sparkline}</div>
-          ` : ''}
-
-          <div class="student-card-actions">
-            <button class="btn-measure" onclick="app.openBMIForStudent(${s.id}, '${s.name}', ${s.age}, '${s.gender}')">
-              📏 Measure BMI
-            </button>
-            <button class="btn-generate" onclick="app.generateForStudent(${s.id}, '${s.name}', '${status}', ${s.age})">
-              🍽️ Generate Plan
-            </button>
-          </div>
-        </div>
-      `;
-    }).join('');
-  },
-
-  renderSparkline(bmiValues) {
-    if (bmiValues.length < 2) return '';
-    const min = Math.min(...bmiValues) - 1;
-    const max = Math.max(...bmiValues) + 1;
-    const w = 120, h = 30;
-    const pts = bmiValues.map((v, i) => {
-      const x = (i / (bmiValues.length - 1)) * w;
-      const y = h - ((v - min) / (max - min)) * h;
-      return `${x},${y}`;
-    }).join(' ');
-    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-      <polyline points="${pts}" fill="none" stroke="#1D9E75" stroke-width="2"/>
-    </svg>`;
-  },
-
-  showAddStudentModal() {
-    const modal = document.createElement('div');
-    modal.className = 'auth-modal-overlay';
-    modal.id = 'add-student-modal';
-    modal.innerHTML = `
-      <div class="auth-modal-box">
-        <button class="auth-modal-close"
-          onclick="document.getElementById('add-student-modal').remove()">✕</button>
-        <h3 style="margin-bottom:16px">Add New Student</h3>
-        <div class="auth-field">
-          <label>Student Name</label>
-          <input type="text" id="new-student-name" placeholder="Full name">
-        </div>
-        <div class="auth-field">
-          <label>Age</label>
-          <input type="number" id="new-student-age" placeholder="Age" min="5" max="15" value="10">
-        </div>
-        <div class="auth-field">
-          <label>Gender</label>
-          <select id="new-student-gender">
-            <option value="Boy">Boy</option>
-            <option value="Girl">Girl</option>
-          </select>
-        </div>
-        <button class="auth-submit-btn" onclick="app.addStudent()">Add Student →</button>
-      </div>
-    `;
-    document.body.appendChild(modal);
-    modal.style.display = 'flex';
-  },
-
-  async addStudent() {
-    const name   = document.getElementById('new-student-name').value.trim();
-    const age    = parseInt(document.getElementById('new-student-age').value);
-    const gender = document.getElementById('new-student-gender').value;
-
-    if (!name) { alert('Please enter student name.'); return; }
-
-    try {
-      const resp = await fetch('/api/students', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ name, age, gender }),
-      });
-      if (resp.ok) {
-        document.getElementById('add-student-modal')?.remove();
-        this.showToast(`${name} added successfully! 🎉`);
-        this.loadDashboard();
-      }
-    } catch (e) {
-      alert('Error adding student.');
-    }
-  },
-
-  async deleteStudent(id, name) {
-    if (!confirm(`Remove ${name} from your class?`)) return;
-    await fetch(`/api/students/${id}`, { method: 'DELETE', credentials: 'include' });
-    this.showToast(`${name} removed.`);
-    this.loadDashboard();
-  },
-
-  openBMIForStudent(id, name, age, gender) {
-    // Pre-fill BMI form with student data
-    const nameEl   = document.getElementById('bmi_student_name');
-    const ageEl    = document.getElementById('bmi_age');
-    const genderEl = document.getElementById('bmi_gender');
-    if (nameEl)   nameEl.value   = name;
-    if (ageEl)    ageEl.value    = age;
-    if (genderEl) genderEl.value = gender;
-
-    // Store student id to save BMI record after calculation
-    document.getElementById('bmi_student_name').dataset.studentId = id;
-    this.navigateTo('bmi');
-  },
-
-  generateForStudent(id, name, bmiStatus, age) {
-    // Pre-fill planner with student data
-    const studentNameEl = document.getElementById('student_name');
-    const bmiStatusEl   = document.getElementById('bmi_status_hidden');
-    const ageGroupEl    = document.getElementById('age_group');
-
-    if (studentNameEl) studentNameEl.value = name;
-    if (bmiStatusEl)   bmiStatusEl.value   = bmiStatus;
-    if (ageGroupEl) {
-      if (age >= 5  && age <= 8)  ageGroupEl.value = '5-8';
-      else if (age >= 9 && age <= 12) ageGroupEl.value = '9-12';
-      else ageGroupEl.value = '13-15';
-    }
-
-    this.autoFillTeacherDetails();
-    this.navigateTo('generator');
-
-    // Auto-generate after navigation
-    setTimeout(() => {
-      const schoolEl  = document.getElementById('school_name');
-      const teacherEl = document.getElementById('teacher_name');
-      if (schoolEl?.value && teacherEl?.value) {
-        const form = document.getElementById('generator-form');
-        if (form) form.dispatchEvent(new Event('submit', { cancelable: true }));
-      }
-    }, 500);
-  },
-
-  // ════════════════════════════════════════════════════════
-  // PHASE 3 — BMI AUTO-FILL TO PLANNER (Fixed)
-  // ════════════════════════════════════════════════════════
+  // ── BMI Calculator ────────────────────────────────────────
   submitBMIForm(event) {
     event.preventDefault();
-
     const name   = document.getElementById('bmi_student_name').value.trim();
     const age    = parseInt(document.getElementById('bmi_age').value);
     const gender = document.getElementById('bmi_gender').value;
     const height = parseFloat(document.getElementById('bmi_height').value);
     const weight = parseFloat(document.getElementById('bmi_weight').value);
-
-    if (!height || !weight || height < 80 || weight < 10) {
-      alert('Please enter valid height and weight values.');
-      return;
-    }
-
+    if (!height || !weight || height < 80 || weight < 10) { alert('Please enter valid height and weight values.'); return; }
     const heightM = height / 100;
-    const bmi     = parseFloat((weight / (heightM * heightM)).toFixed(1));
-
+    const bmi = parseFloat((weight / (heightM * heightM)).toFixed(1));
     let status, color, advice, portionAdvice;
-
     if (bmi < 16.5) {
       status = 'Underweight'; color = '#F59E0B';
       advice = 'The child is underweight. Increase protein and calorie-rich foods. Ragi Mudde, eggs, and pulses are highly recommended.';
@@ -703,102 +432,56 @@ const app = {
       advice = 'The child is obese. Consult a doctor or nutritionist. Focus on fruits, vegetables, and millet-based foods.';
       portionAdvice = 'Strictly controlled portions (70%) with high-fiber foods for weight management.';
     }
-
     this.lastBMIData = { name, age, gender, height, weight, bmi, status };
-
     document.getElementById('bmi-empty').style.display = 'none';
     const reportEl = document.getElementById('bmi-report-view');
     reportEl.style.display = 'flex';
-
     document.getElementById('rep-student-name').textContent  = name || 'Student';
-    document.getElementById('rep-meta-desc').textContent     =
-      `Age: ${age} • Gender: ${gender} • Height: ${height}cm • Weight: ${weight}kg`;
+    document.getElementById('rep-meta-desc').textContent     = `Age: ${age} • Gender: ${gender} • Height: ${height}cm • Weight: ${weight}kg`;
     document.getElementById('rep-bmi-val').textContent       = bmi;
     document.getElementById('rep-status-advice').textContent = advice;
     document.getElementById('rep-portion-advice').textContent = portionAdvice;
-
     const badge = document.getElementById('rep-status-badge');
-    badge.textContent          = status.toUpperCase();
+    badge.textContent = status.toUpperCase();
     badge.style.backgroundColor = color;
-
     const pointerPct = Math.min(Math.max(((bmi - 12) / 26) * 100, 2), 98);
-    const pointer    = document.getElementById('rep-bmi-pointer');
+    const pointer = document.getElementById('rep-bmi-pointer');
     if (pointer) pointer.style.left = `${pointerPct}%`;
-
     document.getElementById('bmi_status_hidden').value = status;
-
-    // Save BMI to database if student_id present
-    const studentId = document.getElementById('bmi_student_name').dataset.studentId;
-    if (studentId && this.currentTeacher) {
-      fetch(`/api/students/${studentId}/bmi`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ height, weight, bmi, status }),
-      }).catch(e => console.log('BMI save error:', e));
-    }
-
     this.showAIAdvisorPanel(name, age, gender, status, bmi, 'Vegetarian', 'Karnataka');
   },
 
-  // PHASE 3 — Auto-generate plan from BMI result
   applyBMIToPlan() {
     if (this.lastBMIData) {
-      const studentNameEl = document.getElementById('student_name');
-      const bmiStatusEl   = document.getElementById('bmi_status_hidden');
-      const ageGroupEl    = document.getElementById('age_group');
-      const opt           = document.getElementById('bmi_optimization_focus');
-      const strategy      = document.getElementById('optimization_strategy');
-
-      if (studentNameEl) studentNameEl.value = this.lastBMIData.name || '';
-      if (bmiStatusEl)   bmiStatusEl.value   = this.lastBMIData.status;
+      document.getElementById('student_name').value = this.lastBMIData.name || '';
+      document.getElementById('bmi_status_hidden').value = this.lastBMIData.status;
+      const opt = document.getElementById('bmi_optimization_focus');
+      const strategy = document.getElementById('optimization_strategy');
       if (opt && strategy) strategy.value = opt.value;
-
-      // Auto-set age group
       const age = this.lastBMIData.age;
+      const ageGroupEl = document.getElementById('age_group');
       if (ageGroupEl) {
-        if (age >= 5 && age <= 8)   ageGroupEl.value = '5-8';
+        if (age >= 5 && age <= 8) ageGroupEl.value = '5-8';
         else if (age >= 9 && age <= 12) ageGroupEl.value = '9-12';
         else ageGroupEl.value = '13-15';
       }
     }
-
-    // Auto-fill teacher details if logged in
     this.autoFillTeacherDetails();
     this.navigateTo('generator');
-
-    // Auto-generate if school + teacher already filled
     setTimeout(() => {
       const schoolEl  = document.getElementById('school_name');
       const teacherEl = document.getElementById('teacher_name');
-
       if (schoolEl?.value?.trim() && teacherEl?.value?.trim()) {
         const form = document.getElementById('generator-form');
         if (form) form.dispatchEvent(new Event('submit', { cancelable: true }));
-      } else {
-        // Highlight empty fields
-        if (schoolEl && !schoolEl.value.trim()) {
-          schoolEl.style.borderColor = '#E8562A';
-          schoolEl.placeholder = '⚠️ Enter school name to auto-generate';
-          schoolEl.focus();
-        }
-        if (teacherEl && !teacherEl.value.trim()) {
-          teacherEl.style.borderColor = '#E8562A';
-          teacherEl.placeholder = '⚠️ Enter teacher name to auto-generate';
-        }
       }
     }, 400);
   },
 
-  // ════════════════════════════════════════════════════════
-  // MEAL PLAN GENERATOR
-  // ════════════════════════════════════════════════════════
+  // ── Meal Plan Generator ───────────────────────────────────
   async submitForm(event) {
     event.preventDefault();
-
-    // If logged in, auto-fill from teacher profile
     this.autoFillTeacherDetails();
-
     const school_name           = document.getElementById('school_name').value.trim();
     const teacher_name          = document.getElementById('teacher_name').value.trim();
     const student_name          = document.getElementById('student_name').value.trim();
@@ -808,48 +491,35 @@ const app = {
     const region                = document.getElementById('region').value;
     const month                 = document.getElementById('month').value;
     const optimization_strategy = document.getElementById('optimization_strategy').value;
-
     let valid = true;
-    if (!school_name) {
-      document.getElementById('err-school').style.display = 'block'; valid = false;
-    } else {
-      document.getElementById('err-school').style.display = 'none';
-    }
-    if (!teacher_name) {
-      document.getElementById('err-teacher').style.display = 'block'; valid = false;
-    } else {
-      document.getElementById('err-teacher').style.display = 'none';
-    }
+    if (!school_name) { document.getElementById('err-school').style.display = 'block'; valid = false; } else { document.getElementById('err-school').style.display = 'none'; }
+    if (!teacher_name) { document.getElementById('err-teacher').style.display = 'block'; valid = false; } else { document.getElementById('err-teacher').style.display = 'none'; }
     if (!valid) return;
-
     document.getElementById('gen-loading').style.display  = 'flex';
     document.getElementById('gen-empty').style.display    = 'none';
     document.getElementById('gen-success').style.display  = 'none';
-
     try {
       const resp = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          school_name, teacher_name, student_name,
-          bmi_status, age_group, preference,
-          region, month, optimization_strategy,
-          bmi_value: this.lastBMIData?.bmi || '',
-          height: this.lastBMIData?.height || 0,
-          weight: this.lastBMIData?.weight || 0,
-        }),
+        body: JSON.stringify({ school_name, teacher_name, student_name, bmi_status, age_group, preference, region, month, optimization_strategy }),
       });
-
       const data = await resp.json();
       if (data.error) { alert(data.error); return; }
 
+      // QR code using free API
+      if (data.qr_code) {
+        const planUrl = `${window.location.origin}/plan/${data.qr_code}`;
+        data.qr_image_url = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(planUrl)}`;
+      }
+
       this.lastPlanData = data;
       this.renderPoster(data);
-
       document.getElementById('gen-success').style.display = 'flex';
       document.getElementById('gen-success').scrollIntoView({ behavior: 'smooth' });
-
+      // Show WhatsApp share box
+      this.showWhatsAppBox(data.qr_code);
     } catch (err) {
       alert('Error generating plan. Please check your connection and try again.');
       console.error(err);
@@ -859,16 +529,145 @@ const app = {
   },
 
   regeneratePlan() {
+    showWhatsAppBox(qrCode) {
+  // Remove old box if exists
+  document.getElementById('whatsapp-share-box')?.remove();
+
+  const planUrl = qrCode
+    ? `${window.location.origin}/plan/${qrCode}`
+    : window.location.href;
+
+  const box = document.createElement('div');
+  box.id = 'whatsapp-share-box';
+  box.style.cssText = `
+    margin: 16px;
+    background: linear-gradient(135deg, #F0FFF4, #DCFCE7);
+    border: 2px solid #25D366;
+    border-radius: 14px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  `;
+
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:28px">📱</span>
+      <div>
+        <h4 style="margin:0;font-size:15px;font-weight:800;color:#1A1A2E">
+          Send to Parent via WhatsApp
+        </h4>
+        <p style="margin:2px 0 0;font-size:12px;color:#64748B">
+          Parent receives a link to view the full meal plan with recipes in English + Kannada
+        </p>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;align-items:center">
+      <div style="position:relative;flex:1">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:700;color:#64748B">+91</span>
+        <input
+          type="tel"
+          id="parent-whatsapp-number"
+          placeholder="Parent's WhatsApp number"
+          maxlength="10"
+          style="width:100%;padding:10px 12px 10px 44px;border:1.5px solid #BBF7D0;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box;font-family:inherit"
+          oninput="this.value=this.value.replace(/[^0-9]/g,'')"
+          onkeydown="if(event.key==='Enter') app.sendWhatsApp('${planUrl}')"
+        >
+      </div>
+      <button
+        onclick="app.sendWhatsApp('${planUrl}')"
+        style="background:#25D366;color:white;border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+          <path d="M12 0C5.373 0 0 5.373 0 12c0 2.098.543 4.063 1.496 5.77L0 24l6.396-1.676A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.804 9.804 0 01-5.002-1.368l-.359-.213-3.797.995 1.013-3.686-.233-.374A9.796 9.796 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/>
+        </svg>
+        Send
+      </button>
+    </div>
+
+    <div id="wa-status-msg" style="display:none;font-size:12px;padding:8px 12px;border-radius:6px"></div>
+
+    <div style="font-size:11px;color:#64748B;display:flex;align-items:center;gap:6px">
+      <span>💡</span>
+      <span>This opens WhatsApp with the plan link pre-filled. Teacher just taps Send.</span>
+    </div>
+  `;
+      regeneratePlan() {
+  // Clear AI advice notes when regenerating
+  this.aiAdviceNotes = [];
+  document.getElementById('poster-ai-advice')?.remove();
+  const form = document.getElementById('generator-form');
+  if (form) form.dispatchEvent(new Event('submit', { cancelable: true }));
+},
+
+  // Insert after poster actions bar
+  const actionsBar = document.querySelector('.poster-actions-bar');
+  if (actionsBar) {
+    actionsBar.insertAdjacentElement('afterend', box);
+  } else {
+    const genSuccess = document.getElementById('gen-success');
+    if (genSuccess) genSuccess.appendChild(box);
+  }
+},
+
+sendWhatsApp(planUrl) {
+  const input   = document.getElementById('parent-whatsapp-number');
+  const statusEl = document.getElementById('wa-status-msg');
+  const number  = input?.value?.trim();
+
+  if (!number || number.length !== 10) {
+    if (statusEl) {
+      statusEl.textContent = '⚠️ Please enter a valid 10-digit WhatsApp number.';
+      statusEl.style.cssText = 'display:block;background:#FEF3C7;color:#B45309;font-size:12px;padding:8px 12px;border-radius:6px';
+    }
+    input?.focus();
+    return;
+  }
+
+  const studentName = document.getElementById('student_name')?.value || 'your child';
+  const schoolName  = document.getElementById('school_name')?.value  || 'the school';
+  const month       = document.getElementById('month')?.value        || 'this month';
+
+  const message = `🌾 *NutriPrint — Healthy Meal Plan*
+
+Namaskara! 🙏
+
+${studentName}'s personalised weekly meal plan for *${month}* from *${schoolName}* is ready.
+
+📋 *View full plan with recipes here:*
+${planUrl}
+
+The plan includes:
+✅ Balanced meals using local Karnataka foods
+✅ Serving sizes & nutrition values
+✅ Full recipes in English + Kannada
+✅ Under ₹50 per meal
+
+_Hang the plan on your kitchen wall and follow it daily for your child's healthy growth._
+
+— NutriPrint, Yenepoya Institute of Technology 🌱`;
+
+  const waUrl = `https://wa.me/91${number}?text=${encodeURIComponent(message)}`;
+  window.open(waUrl, '_blank');
+
+  // Show success
+  if (statusEl) {
+    statusEl.textContent = `✅ WhatsApp opened for +91 ${number}. Tap Send in WhatsApp!`;
+    statusEl.style.cssText = 'display:block;background:#D1FAE5;color:#065F46;font-size:12px;padding:8px 12px;border-radius:6px';
+  }
+
+  this.showToast(`WhatsApp opened for +91${number} 📱`);
+},
     const form = document.getElementById('generator-form');
     if (form) form.dispatchEvent(new Event('submit', { cancelable: true }));
   },
 
-  // ════════════════════════════════════════════════════════
-  // POSTER RENDERER (FIX 2 + FIX 3 + QR Code)
-  // ════════════════════════════════════════════════════════
+  // ── Poster Renderer ───────────────────────────────────────
   renderPoster(data) {
     const { school_details, meal_plan } = data;
-
     document.getElementById('post-school-title').textContent = school_details.school_name;
     document.getElementById('post-teacher-val').textContent  = school_details.teacher_name;
     document.getElementById('post-month-val').textContent    = `${school_details.month} 2026`;
@@ -876,32 +675,28 @@ const app = {
       <strong>Portion Guideline / ಭಾಗದ ಪ್ರಮಾಣ:</strong> ${school_details.portion_label_en}
       <span class="lang-kn">${school_details.portion_label_kn || ''}</span>
     `;
-
     const badge = document.getElementById('post-student-badge');
     if (school_details.student_name) {
       badge.style.display = 'flex';
       document.getElementById('post-student-name-val').textContent = school_details.student_name;
-      document.getElementById('post-student-bmi-val').textContent  =
-        `Growth Status: ${school_details.bmi_status || 'Normal'}`;
+      document.getElementById('post-student-bmi-val').textContent  = `Growth Status: ${school_details.bmi_status || 'Normal'}`;
     } else {
       badge.style.display = 'none';
     }
-
-    // PHASE 4 — QR Code display
     const qrContainer = document.getElementById('poster-qr-container');
-    if (qrContainer && data.qr_code) {
-      const planUrl = `${window.location.origin}/plan/${data.qr_code}`;
-      // Generate QR using free API
-      qrContainer.innerHTML = `
-        <div class="qr-box">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(planUrl)}"
-               alt="QR Code" width="100" height="100" loading="lazy">
-          <div class="qr-label">Scan for recipes & digital plan</div>
-          <div class="qr-code-text">${data.qr_code}</div>
-        </div>
-      `;
+    if (qrContainer) {
+      if (data.qr_image_url) {
+        qrContainer.innerHTML = `
+          <div class="qr-box">
+            <img src="${data.qr_image_url}" alt="QR Code" width="100" height="100" loading="lazy">
+            <div class="qr-label">Scan for full recipes & digital plan</div>
+            <div class="qr-code-text">${data.qr_code || ''}</div>
+          </div>
+        `;
+      } else {
+        qrContainer.innerHTML = '';
+      }
     }
-
     const canvas    = document.getElementById('poster-grid-canvas');
     const days      = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const mealSlots = ['breakfast', 'lunch', 'snack', 'dinner'];
@@ -911,25 +706,18 @@ const app = {
       snack:     { en: '🌤️ Snack',     kn: 'ಸಂಜೆ ತಿಂಡಿ'  },
       dinner:    { en: '🌙 Dinner',    kn: 'ರಾತ್ರಿ ಊಟ'    },
     };
-
     const allCells = canvas.querySelectorAll('.grid-cell');
     allCells.forEach((cell, i) => { if (i >= 7) cell.remove(); });
-
     mealSlots.forEach(slot => {
       const labelCell = document.createElement('div');
       labelCell.className = 'grid-cell meal-slot-label';
-      labelCell.innerHTML = `
-        <span class="slot-en">${slotLabels[slot].en}</span>
-        <span class="kn-day">${slotLabels[slot].kn}</span>
-      `;
+      labelCell.innerHTML = `<span class="slot-en">${slotLabels[slot].en}</span><span class="kn-day">${slotLabels[slot].kn}</span>`;
       canvas.appendChild(labelCell);
-
       days.forEach(day => {
         const dayData = meal_plan[day];
         const food    = dayData ? dayData[slot] : null;
         const cell    = document.createElement('div');
         cell.className = 'grid-cell meal-data-cell';
-
         if (food) {
           const emoji = getFoodEmoji(food.name_en);
           cell.innerHTML = `
@@ -938,9 +726,9 @@ const app = {
             <div class="food-name-kn">${food.name_kn || ''}</div>
             <div class="food-nutrition-row">
               <span>📏 ${food.serving_size || '1 portion'}</span>
-              <span>P: ${food.scaled_protein  ?? food.protein  ?? 0}g</span>
+              <span>P: ${food.scaled_protein ?? food.protein ?? 0}g</span>
               <span>Ca: ${food.scaled_calcium ?? food.calcium ?? 0}mg</span>
-              <span>Fe: ${food.scaled_iron    ?? food.iron    ?? 0}mg</span>
+              <span>Fe: ${food.scaled_iron ?? food.iron ?? 0}mg</span>
             </div>
             <div class="food-cost-tag">₹${food.scaled_cost ?? food.cost ?? 0}</div>
           `;
@@ -950,16 +738,10 @@ const app = {
         canvas.appendChild(cell);
       });
     });
-
-    // Summary row
     const summaryLabel = document.createElement('div');
     summaryLabel.className = 'grid-cell summary-label-cell';
-    summaryLabel.innerHTML = `
-      <span class="slot-en">📊 Daily Total</span>
-      <span class="kn-day">ದಿನದ ಒಟ್ಟು</span>
-    `;
+    summaryLabel.innerHTML = `<span class="slot-en">📊 Daily Total</span><span class="kn-day">ದಿನದ ಒಟ್ಟು</span>`;
     canvas.appendChild(summaryLabel);
-
     days.forEach(day => {
       const dayData = meal_plan[day];
       const cell    = document.createElement('div');
@@ -977,171 +759,610 @@ const app = {
     });
   },
 
-  // ════════════════════════════════════════════════════════
-  // NUTRITION LIBRARY
-  // ════════════════════════════════════════════════════════
+  // ── Nutrition Library ─────────────────────────────────────
   async loadLibrary() {
     const canvas = document.getElementById('library-cards-canvas');
     if (!canvas) return;
-
     const search  = document.getElementById('lib-search')?.value || '';
     const cat     = document.getElementById('lib-filter-cat')?.value || '';
     const vegOnly = document.getElementById('lib-filter-veg')?.value === 'veg';
-
     let url = `/api/nutrition?search=${encodeURIComponent(search)}`;
     if (cat)     url += `&category=${encodeURIComponent(cat)}`;
     if (vegOnly) url += '&veg_only=true';
-
     try {
       const resp  = await fetch(url);
       const foods = await resp.json();
       canvas.innerHTML = '';
-
-      if (!foods.length) {
-        canvas.innerHTML = `<p style="color:#64748B;text-align:center;padding:40px;">No foods found.</p>`;
-        return;
-      }
-
+      if (!foods.length) { canvas.innerHTML = `<p style="color:#64748B;text-align:center;padding:40px;">No foods found.</p>`; return; }
       foods.forEach(food => {
         const emoji = getFoodEmoji(food.name_en);
         const card  = document.createElement('div');
         card.className = 'food-card';
-
-        // PHASE 4 — Show full recipe with ingredients + steps
-        const stepsHtml = food.recipe_steps
-          ? food.recipe_steps.split('.').filter(s => s.trim()).map((s, i) =>
-              `<div class="recipe-step"><span class="step-num">${i+1}</span>${s.trim()}.</div>`
-            ).join('')
-          : '';
-
         card.innerHTML = `
           <div class="food-card-emoji">${emoji}</div>
           <div class="food-card-body">
             <h4>${food.name_en} <span class="kn-name">${food.name_kn || ''}</span></h4>
+            <p class="food-card-desc">${food.recipe_tip_en || ''}</p>
             <div class="food-card-macros">
-              <div class="macro-pill">
-                <span class="macro-label">Serving</span>
-                <span class="macro-val">${food.serving_size || '1 portion'}</span>
-              </div>
-              <div class="macro-pill">
-                <span class="macro-label">Protein</span>
-                <span class="macro-val">${food.protein}g</span>
-              </div>
-              <div class="macro-pill">
-                <span class="macro-label">Calcium</span>
-                <span class="macro-val">${food.calcium}mg</span>
-              </div>
-              <div class="macro-pill">
-                <span class="macro-label">Iron</span>
-                <span class="macro-val">${food.iron}mg</span>
-              </div>
-              <div class="macro-pill cost-pill">
-                <span class="macro-label">Cost</span>
-                <span class="macro-val">₹${food.cost}</span>
-              </div>
-            </div>
-            ${food.ingredients ? `
-              <div class="recipe-section">
-                <div class="recipe-title">🛒 Ingredients</div>
-                <div class="recipe-ingredients">${food.ingredients}</div>
-              </div>
-            ` : ''}
-            ${stepsHtml ? `
-              <div class="recipe-section">
-                <div class="recipe-title">👩‍🍳 How to Make</div>
-                <div class="recipe-steps">${stepsHtml}</div>
-              </div>
-            ` : ''}
-            <div class="recipe-section">
-              <div class="recipe-title">💡 Tip / ಸಲಹೆ</div>
-              <div class="recipe-tip">${food.recipe_tip_en || ''}</div>
-              ${food.recipe_tip_kn ? `<div class="recipe-tip kn">${food.recipe_tip_kn}</div>` : ''}
+              <div class="macro-pill"><span class="macro-label">Serving</span><span class="macro-val">${food.serving_size || '1 portion'}</span></div>
+              <div class="macro-pill"><span class="macro-label">Protein</span><span class="macro-val">${food.protein}g</span></div>
+              <div class="macro-pill"><span class="macro-label">Calcium</span><span class="macro-val">${food.calcium}mg</span></div>
+              <div class="macro-pill"><span class="macro-label">Iron</span><span class="macro-val">${food.iron}mg</span></div>
+              <div class="macro-pill"><span class="macro-label">Carbs</span><span class="macro-val">${food.carbs}g</span></div>
+              <div class="macro-pill cost-pill"><span class="macro-label">Cost</span><span class="macro-val">₹${food.cost}</span></div>
             </div>
             <div class="food-card-tags">
               <span class="tag cat-tag">${food.category}</span>
               ${food.is_veg ? '<span class="tag veg-tag">🌿 Veg</span>' : ''}
-              ${food.is_egg ? '<span class="tag egg-tag">🥚 Egg</span>'  : ''}
+              ${food.is_egg ? '<span class="tag egg-tag">🥚 Egg</span>' : ''}
+            </div>
+            <div class="food-recipe-box" style="margin-top:8px;font-size:11px;color:#475569;">
+              <strong>Recipe Tip / ಅಡುಗೆ ಸಲಹೆ:</strong> ${food.recipe_tip_en || ''}
+              ${food.recipe_tip_kn ? `<div style="margin-top:4px;font-size:10px;color:#64748B;">${food.recipe_tip_kn}</div>` : ''}
             </div>
           </div>
         `;
         canvas.appendChild(card);
       });
-
     } catch (err) {
-      canvas.innerHTML = `<p style="color:#EF4444;text-align:center;padding:40px;">Error loading. Please refresh.</p>`;
+      canvas.innerHTML = `<p style="color:#EF4444;text-align:center;padding:40px;">Error loading foods. Please refresh.</p>`;
     }
   },
 
   filterLibrary() { this.loadLibrary(); },
 
-  // ════════════════════════════════════════════════════════
-  // PHASE 5 — PWA: Service Worker Registration
-  // ════════════════════════════════════════════════════════
-  registerServiceWorker() {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('SW registered:', reg.scope))
-        .catch(err => console.log('SW error:', err));
+  // ════════════════════════════════════════════════════════════
+  // DASHBOARD
+  // ════════════════════════════════════════════════════════════
+  async loadDashboard() {
+    if (!this.currentTeacher) {
+      this.showAuthModal('login');
+      return;
+    }
+    const container = document.getElementById('dashboard-section');
+    if (!container) return;
+    container.innerHTML = `
+      <div class="dashboard-wrapper">
+        <div class="dashboard-header">
+          <div>
+            <h2>📊 My Class Dashboard</h2>
+            <p>${this.currentTeacher.school_name} • ${this.currentTeacher.district || ''}</p>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="add-student-btn" onclick="app.showAddStudentModal()">+ Add Student</button>
+            <button class="add-student-btn" style="background:#1A1A2E;" onclick="app.generateAllPosters()">🍽️ Generate All Plans</button>
+          </div>
+        </div>
+        <div id="dashboard-stats" class="dashboard-stats"></div>
+        <div id="students-grid" class="students-grid">
+          <div style="text-align:center;padding:40px;color:#64748B;">Loading students...</div>
+        </div>
+      </div>
+    `;
+    try {
+      const resp = await fetch('/api/students', { credentials: 'include' });
+      const students = await resp.json();
+      this.students = students;
+      this.renderStudentsGrid(students);
+      this.renderDashboardStats(students);
+    } catch (e) {
+      document.getElementById('students-grid').innerHTML = '<p style="color:#EF4444;text-align:center">Error loading students.</p>';
     }
   },
 
-  // ════════════════════════════════════════════════════════
-  // PHASE 6 — VOICE INPUT
-  // ════════════════════════════════════════════════════════
-  startVoiceInput(targetFieldId) {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      this.showToast('Voice input not supported in this browser. Try Chrome.');
+  renderDashboardStats(students) {
+    const el = document.getElementById('dashboard-stats');
+    if (!el) return;
+    const total       = students.length;
+    const underweight = students.filter(s => s.latest_bmi?.status === 'Underweight').length;
+    const normal      = students.filter(s => s.latest_bmi?.status === 'Normal').length;
+    const overweight  = students.filter(s => ['Overweight','Obese'].includes(s.latest_bmi?.status)).length;
+    el.innerHTML = `
+      <div class="stat-card total-card"><div class="stat-num">${total}</div><div class="stat-label">Total Students</div></div>
+      <div class="stat-card normal-card"><div class="stat-num">${normal}</div><div class="stat-label">✅ Normal BMI</div></div>
+      <div class="stat-card under-card"><div class="stat-num">${underweight}</div><div class="stat-label">⚠️ Underweight</div></div>
+      <div class="stat-card over-card"><div class="stat-num">${overweight}</div><div class="stat-label">🔴 Overweight</div></div>
+    `;
+  },
+
+  renderStudentsGrid(students) {
+    const grid = document.getElementById('students-grid');
+    if (!grid) return;
+    if (!students.length) {
+      grid.innerHTML = `
+        <div class="empty-students">
+          <div style="font-size:48px">👩‍🎓</div>
+          <p>No students added yet.</p>
+          <button class="add-student-btn" onclick="app.showAddStudentModal()">+ Add First Student</button>
+        </div>
+      `;
+      return;
+    }
+    grid.innerHTML = students.map(s => {
+      const bmi    = s.latest_bmi;
+      const status = bmi ? bmi.status : 'Not measured';
+      const color  = status === 'Normal' ? '#10B981' : status === 'Underweight' ? '#F59E0B' : status === 'Overweight' || status === 'Obese' ? '#EF4444' : '#94A3B8';
+      const history = s.bmi_history || [];
+      const sparkline = history.length >= 2 ? this.renderSparkline(history.map(h => h.bmi)) : '';
+      return `
+        <div class="student-card">
+          <div class="student-card-top">
+            <div class="student-avatar">${s.gender === 'Girl' ? '👧' : '👦'}</div>
+            <div class="student-info">
+              <h4>${s.name}</h4>
+              <p>Age: ${s.age} • ${s.gender}</p>
+            </div>
+            <button class="student-delete-btn" onclick="app.deleteStudent(${s.id}, '${s.name}')">🗑️</button>
+          </div>
+          <div class="student-bmi-row">
+            <span class="bmi-status-tag" style="background:${color}20;color:${color}">${status}</span>
+            ${bmi ? `<span class="bmi-value-tag">BMI: ${bmi.bmi}</span>` : ''}
+          </div>
+          ${sparkline ? `<div class="sparkline-label">BMI Progress (${history.length} records)</div><div class="sparkline-container">${sparkline}</div>` : ''}
+          <div class="student-card-actions">
+            <button class="btn-measure" onclick="app.openBMIForStudent(${s.id}, '${s.name}', ${s.age}, '${s.gender}')">📏 Measure BMI</button>
+            <button class="btn-generate" onclick="app.generateForStudent(${s.id}, '${s.name}', '${status}', ${s.age})">🍽️ Generate Plan</button>
+            <button class="btn-chart" onclick="app.showProgressChart(${s.id}, '${s.name}')">📈 Progress</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  },
+
+  renderSparkline(bmiValues) {
+    if (bmiValues.length < 2) return '';
+    const min = Math.min(...bmiValues) - 1;
+    const max = Math.max(...bmiValues) + 1;
+    const w = 140, h = 36;
+    const pts = bmiValues.map((v, i) => {
+      const x = (i / (bmiValues.length - 1)) * (w - 4) + 2;
+      const y = h - ((v - min) / (max - min)) * (h - 4) - 2;
+      return `${x},${y}`;
+    }).join(' ');
+    const lastBMI   = bmiValues[bmiValues.length - 1];
+    const firstBMI  = bmiValues[0];
+    const trend     = lastBMI < firstBMI ? '#10B981' : lastBMI > firstBMI ? '#EF4444' : '#64748B';
+    return `
+      <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block">
+        <polyline points="${pts}" fill="none" stroke="${trend}" stroke-width="2" stroke-linejoin="round"/>
+        ${bmiValues.map((v, i) => {
+          const x = (i / (bmiValues.length - 1)) * (w - 4) + 2;
+          const y = h - ((v - min) / (max - min)) * (h - 4) - 2;
+          return `<circle cx="${x}" cy="${y}" r="3" fill="${trend}" stroke="white" stroke-width="1.5"/>`;
+        }).join('')}
+      </svg>
+    `;
+  },
+
+  // ════════════════════════════════════════════════════════════
+  // WEEKLY PROGRESS TRACKER — Full BMI Growth Chart
+  // ════════════════════════════════════════════════════════════
+  async showProgressChart(studentId, studentName) {
+    // Fetch full BMI history from backend
+    let history = [];
+    try {
+      const resp = await fetch('/api/students', { credentials: 'include' });
+      const students = await resp.json();
+      const student  = students.find(s => s.id === studentId);
+      history = student?.bmi_history || [];
+    } catch (e) {
+      this.showToast('Error loading BMI history.');
       return;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-IN';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    const modal = document.createElement('div');
+    modal.id = 'progress-modal';
+    modal.className = 'auth-modal-overlay';
 
-    const btn = document.getElementById(`voice-btn-${targetFieldId}`);
-    if (btn) {
-      btn.textContent = '🔴 Listening...';
-      btn.style.background = '#EF4444';
+    if (!history.length) {
+      modal.innerHTML = `
+        <div class="auth-modal-box" style="max-width:480px">
+          <button class="auth-modal-close" onclick="document.getElementById('progress-modal').remove()">✕</button>
+          <div style="text-align:center;padding:32px 16px">
+            <div style="font-size:48px;margin-bottom:16px">📏</div>
+            <h3 style="margin-bottom:8px">${studentName}</h3>
+            <p style="color:#64748B">No BMI records yet.<br>Measure this student's BMI first to start tracking progress.</p>
+            <button class="auth-submit-btn" style="margin-top:20px" onclick="document.getElementById('progress-modal').remove();app.openBMIForStudent(${studentId},'${studentName}',10,'Boy')">
+              📏 Measure BMI Now
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      modal.style.display = 'flex';
+      return;
     }
 
-    recognition.start();
-    this.voiceListening = true;
+    // Build chart data
+    const months  = history.map((h, i) => {
+      const d = new Date(h.recorded_at);
+      return isNaN(d) ? `Record ${i+1}` : d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+    });
+    const bmiVals = history.map(h => parseFloat(h.bmi));
+    const statuses = history.map(h => h.status);
 
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      const field = document.getElementById(targetFieldId);
-      if (field) {
-        field.value = transcript;
-        field.dispatchEvent(new Event('input'));
-      }
-      this.showToast(`Heard: "${transcript}"`);
-    };
+    const minBMI = Math.max(0, Math.min(...bmiVals) - 2);
+    const maxBMI = Math.max(...bmiVals) + 2;
 
-    recognition.onerror = (event) => {
-      this.showToast('Voice input error. Please try again.');
-      console.error('Voice error:', event.error);
-    };
+    // SVG chart dimensions
+    const W = 560, H = 260, PAD = { top: 20, right: 20, bottom: 50, left: 44 };
+    const chartW = W - PAD.left - PAD.right;
+    const chartH = H - PAD.top - PAD.bottom;
 
-    recognition.onend = () => {
-      this.voiceListening = false;
-      if (btn) {
-        btn.textContent = '🎤';
-        btn.style.background = '';
-      }
-    };
+    const xScale = (i) => PAD.left + (i / Math.max(bmiVals.length - 1, 1)) * chartW;
+    const yScale = (v) => PAD.top + chartH - ((v - minBMI) / (maxBMI - minBMI)) * chartH;
+
+    // Zone colors
+    const zones = [
+      { label: 'Obese',       min: 27.5, max: maxBMI+2, color: '#FEE2E2' },
+      { label: 'Overweight',  min: 23,   max: 27.5,     color: '#FEF3C7' },
+      { label: 'Normal',      min: 16.5, max: 23,       color: '#D1FAE5' },
+      { label: 'Underweight', min: minBMI-2, max: 16.5, color: '#FEF9C3' },
+    ];
+
+    const zoneRects = zones.map(z => {
+      const y1 = yScale(Math.min(z.max, maxBMI));
+      const y2 = yScale(Math.max(z.min, minBMI));
+      const h  = Math.max(0, y2 - y1);
+      if (h <= 0) return '';
+      return `<rect x="${PAD.left}" y="${y1}" width="${chartW}" height="${h}" fill="${z.color}" opacity="0.6"/>`;
+    }).join('');
+
+    // Grid lines + Y labels
+    const gridLines = [16.5, 23, 27.5].map(val => {
+      if (val < minBMI || val > maxBMI) return '';
+      const y = yScale(val);
+      return `
+        <line x1="${PAD.left}" y1="${y}" x2="${PAD.left+chartW}" y2="${y}"
+          stroke="#CBD5E1" stroke-width="1" stroke-dasharray="4 3"/>
+        <text x="${PAD.left - 6}" y="${y+4}" font-size="9" fill="#94A3B8" text-anchor="end">${val}</text>
+      `;
+    }).join('');
+
+    // Y axis labels
+    const ySteps = 5;
+    const yLabels = Array.from({ length: ySteps + 1 }, (_, i) => {
+      const val = minBMI + (i / ySteps) * (maxBMI - minBMI);
+      const y   = yScale(val);
+      return `<text x="${PAD.left - 6}" y="${y+4}" font-size="9" fill="#94A3B8" text-anchor="end">${val.toFixed(1)}</text>`;
+    }).join('');
+
+    // Line path
+    const linePts = bmiVals.map((v, i) => `${i === 0 ? 'M' : 'L'}${xScale(i)},${yScale(v)}`).join(' ');
+
+    // Area fill
+    const areaPath = bmiVals.length > 1
+      ? `M${xScale(0)},${yScale(bmiVals[0])} ${bmiVals.slice(1).map((v,i) => `L${xScale(i+1)},${yScale(v)}`).join(' ')} L${xScale(bmiVals.length-1)},${PAD.top+chartH} L${PAD.left},${PAD.top+chartH} Z`
+      : '';
+
+    // Data points + tooltips
+    const points = bmiVals.map((v, i) => {
+      const x = xScale(i);
+      const y = yScale(v);
+      const s = statuses[i];
+      const c = s === 'Normal' ? '#10B981' : s === 'Underweight' ? '#F59E0B' : '#EF4444';
+      return `
+        <circle cx="${x}" cy="${y}" r="5" fill="${c}" stroke="white" stroke-width="2">
+          <title>${months[i]}: BMI ${v} (${s})</title>
+        </circle>
+        <text x="${x}" y="${y-10}" font-size="9" fill="${c}" text-anchor="middle" font-weight="700">${v}</text>
+      `;
+    }).join('');
+
+    // X labels
+    const xLabels = months.map((m, i) => {
+      const x = xScale(i);
+      return `<text x="${x}" y="${PAD.top+chartH+16}" font-size="9" fill="#64748B" text-anchor="middle" transform="rotate(-30 ${x} ${PAD.top+chartH+16})">${m}</text>`;
+    }).join('');
+
+    // Trend analysis
+    const firstVal   = bmiVals[0];
+    const lastVal    = bmiVals[bmiVals.length - 1];
+    const diff       = (lastVal - firstVal).toFixed(1);
+    const trendIcon  = diff < 0 ? '📉' : diff > 0 ? '📈' : '➡️';
+    const lastStatus = statuses[statuses.length - 1];
+    const statusColor = lastStatus === 'Normal' ? '#10B981' : lastStatus === 'Underweight' ? '#F59E0B' : '#EF4444';
+
+    const trendMsg = lastStatus === 'Normal'
+      ? '✅ Child is in healthy BMI range. Keep maintaining current diet!'
+      : lastStatus === 'Underweight'
+      ? '⚠️ Child is underweight. Increase protein and calorie-rich foods like Ragi Mudde and pulses.'
+      : '🔴 Child is overweight. Reduce junk food and increase fiber-rich foods like Jowar Roti and vegetables.';
+
+    modal.innerHTML = `
+      <div class="auth-modal-box" style="max-width:640px;padding:24px">
+        <button class="auth-modal-close" onclick="document.getElementById('progress-modal').remove()">✕</button>
+
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <div style="font-size:36px">${history[0]?.gender === 'Girl' ? '👧' : '👦'}</div>
+          <div>
+            <h3 style="margin:0;font-size:18px;color:#1A1A2E">${studentName}</h3>
+            <p style="margin:4px 0 0;font-size:12px;color:#64748B">${history.length} BMI records • Progress Tracker</p>
+          </div>
+          <div style="margin-left:auto;text-align:right">
+            <div style="font-size:22px;font-weight:800;color:${statusColor}">${lastVal}</div>
+            <div style="font-size:11px;font-weight:700;color:${statusColor}">${lastStatus}</div>
+          </div>
+        </div>
+
+        <!-- SVG Chart -->
+        <div style="background:#F8FAFC;border-radius:12px;padding:16px;margin-bottom:16px;overflow-x:auto">
+          <svg width="100%" viewBox="0 0 ${W} ${H}" style="min-width:320px">
+            <!-- Zone backgrounds -->
+            ${zoneRects}
+            <!-- Grid lines -->
+            ${gridLines}
+            <!-- Y labels -->
+            ${yLabels}
+            <!-- Area fill -->
+            ${areaPath ? `<path d="${areaPath}" fill="#1D9E75" opacity="0.08"/>` : ''}
+            <!-- Line -->
+            ${bmiVals.length > 1 ? `<path d="${linePts}" fill="none" stroke="#1D9E75" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : ''}
+            <!-- Points -->
+            ${points}
+            <!-- X labels -->
+            ${xLabels}
+            <!-- Axes -->
+            <line x1="${PAD.left}" y1="${PAD.top}" x2="${PAD.left}" y2="${PAD.top+chartH}" stroke="#E2E8F0" stroke-width="1.5"/>
+            <line x1="${PAD.left}" y1="${PAD.top+chartH}" x2="${PAD.left+chartW}" y2="${PAD.top+chartH}" stroke="#E2E8F0" stroke-width="1.5"/>
+          </svg>
+        </div>
+
+        <!-- Zone Legend -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+          <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#D1FAE5;color:#065F46;font-weight:700">Normal (16.5–23)</span>
+          <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#FEF9C3;color:#854D0E;font-weight:700">Underweight (&lt;16.5)</span>
+          <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#FEF3C7;color:#92400E;font-weight:700">Overweight (23–27.5)</span>
+          <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:#FEE2E2;color:#991B1B;font-weight:700">Obese (&gt;27.5)</span>
+        </div>
+
+        <!-- Trend Summary -->
+        <div style="background:${statusColor}15;border:1.5px solid ${statusColor}40;border-radius:10px;padding:14px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <span style="font-size:20px">${trendIcon}</span>
+            <strong style="font-size:13px;color:#1A1A2E">
+              BMI ${diff > 0 ? '+' : ''}${diff} since first record
+            </strong>
+          </div>
+          <p style="font-size:12px;color:#475569;margin:0">${trendMsg}</p>
+        </div>
+
+        <!-- BMI History Table -->
+        <div style="border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;margin-bottom:16px">
+          <div style="background:#1A1A2E;padding:10px 14px;font-size:12px;font-weight:700;color:white">
+            📋 Full BMI History
+          </div>
+          <div style="max-height:180px;overflow-y:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead>
+                <tr style="background:#F8FAFC">
+                  <th style="padding:8px 12px;text-align:left;color:#64748B;font-weight:700;border-bottom:1px solid #E2E8F0">#</th>
+                  <th style="padding:8px 12px;text-align:left;color:#64748B;font-weight:700;border-bottom:1px solid #E2E8F0">Date</th>
+                  <th style="padding:8px 12px;text-align:left;color:#64748B;font-weight:700;border-bottom:1px solid #E2E8F0">BMI</th>
+                  <th style="padding:8px 12px;text-align:left;color:#64748B;font-weight:700;border-bottom:1px solid #E2E8F0">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${history.map((h, i) => {
+                  const d = new Date(h.recorded_at);
+                  const dateStr = isNaN(d) ? `Record ${i+1}` : d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+                  const sc = h.status === 'Normal' ? '#10B981' : h.status === 'Underweight' ? '#F59E0B' : '#EF4444';
+                  return `
+                    <tr style="border-bottom:1px solid #F1F5F9">
+                      <td style="padding:8px 12px;color:#94A3B8">${i+1}</td>
+                      <td style="padding:8px 12px;color:#475569">${dateStr}</td>
+                      <td style="padding:8px 12px;font-weight:700;color:#1A1A2E">${h.bmi}</td>
+                      <td style="padding:8px 12px"><span style="background:${sc}20;color:${sc};padding:2px 8px;border-radius:20px;font-weight:700;font-size:11px">${h.status}</span></td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div style="display:flex;gap:10px">
+          <button class="auth-submit-btn" style="flex:1" onclick="document.getElementById('progress-modal').remove();app.openBMIForStudent(${studentId},'${studentName}',10,'Boy')">
+            📏 Add New Measurement
+          </button>
+          <button style="flex:1;background:#F0FDF4;color:#1D9E75;border:1.5px solid #1D9E75;border-radius:10px;padding:12px;font-weight:700;cursor:pointer;font-size:14px"
+            onclick="document.getElementById('progress-modal').remove();app.generateForStudent(${studentId},'${studentName}','${lastStatus}',10)">
+            🍽️ Generate Meal Plan
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
   },
 
-  // ════════════════════════════════════════════════════════
-  // GEMINI AI ADVISOR (preserved from previous version)
-  // ════════════════════════════════════════════════════════
+  showAddStudentModal() {
+    const modal = document.createElement('div');
+    modal.className = 'auth-modal-overlay';
+    modal.id = 'add-student-modal';
+    modal.innerHTML = `
+      <div class="auth-modal-box">
+        <button class="auth-modal-close" onclick="document.getElementById('add-student-modal').remove()">✕</button>
+        <h3 style="margin-bottom:16px">Add New Student</h3>
+        <div class="auth-field"><label>Student Name</label><input type="text" id="new-student-name" placeholder="Full name"></div>
+        <div class="auth-field"><label>Age</label><input type="number" id="new-student-age" placeholder="Age" min="5" max="15" value="10"></div>
+        <div class="auth-field"><label>Gender</label><select id="new-student-gender"><option value="Boy">Boy</option><option value="Girl">Girl</option></select></div>
+        <button class="auth-submit-btn" onclick="app.addStudent()">Add Student →</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+  },
+
+  async addStudent() {
+    const name   = document.getElementById('new-student-name').value.trim();
+    const age    = parseInt(document.getElementById('new-student-age').value);
+    const gender = document.getElementById('new-student-gender').value;
+    if (!name) { alert('Please enter student name.'); return; }
+    try {
+      const resp = await fetch('/api/students', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ name, age, gender }),
+      });
+      if (resp.ok) {
+        document.getElementById('add-student-modal')?.remove();
+        this.showToast(`${name} added! 🎉`);
+        this.loadDashboard();
+      }
+    } catch (e) { alert('Error adding student.'); }
+  },
+
+  async deleteStudent(id, name) {
+    if (!confirm(`Remove ${name} from your class?`)) return;
+    await fetch(`/api/students/${id}`, { method: 'DELETE', credentials: 'include' });
+    this.showToast(`${name} removed.`);
+    this.loadDashboard();
+  },
+
+  openBMIForStudent(id, name, age, gender) {
+    const nameEl   = document.getElementById('bmi_student_name');
+    const ageEl    = document.getElementById('bmi_age');
+    const genderEl = document.getElementById('bmi_gender');
+    if (nameEl)   nameEl.value   = name;
+    if (ageEl)    ageEl.value    = age;
+    if (genderEl) genderEl.value = gender;
+    if (nameEl) nameEl.dataset.studentId = id;
+    this.navigateTo('bmi');
+  },
+
+  generateForStudent(id, name, bmiStatus, age) {
+    const studentNameEl = document.getElementById('student_name');
+    const bmiStatusEl   = document.getElementById('bmi_status_hidden');
+    const ageGroupEl    = document.getElementById('age_group');
+    if (studentNameEl) studentNameEl.value = name;
+    if (bmiStatusEl)   bmiStatusEl.value   = bmiStatus;
+    if (ageGroupEl) {
+      if (age <= 8) ageGroupEl.value = '5-8';
+      else if (age <= 12) ageGroupEl.value = '9-12';
+      else ageGroupEl.value = '13-15';
+    }
+    this.autoFillTeacherDetails();
+    this.navigateTo('generator');
+    setTimeout(() => {
+      const schoolEl  = document.getElementById('school_name');
+      const teacherEl = document.getElementById('teacher_name');
+      if (schoolEl?.value && teacherEl?.value) {
+        const form = document.getElementById('generator-form');
+        if (form) form.dispatchEvent(new Event('submit', { cancelable: true }));
+      }
+    }, 500);
+  },
+
+  // ── Bulk Generate ─────────────────────────────────────────
+  async generateAllPosters() {
+    if (!this.students?.length) { this.showToast('No students found. Add students first!'); return; }
+    const studentsWithBMI = this.students.filter(s => s.latest_bmi);
+    if (!studentsWithBMI.length) { this.showToast('No students have BMI recorded yet!'); return; }
+    const modal = document.createElement('div');
+    modal.id = 'bulk-modal';
+    modal.className = 'auth-modal-overlay';
+    modal.innerHTML = `
+      <div class="auth-modal-box" style="max-width:480px">
+        <h3 style="margin-bottom:8px">🍽️ Generating All Posters</h3>
+        <p style="font-size:13px;color:#64748B;margin-bottom:20px">Creating meal plans for ${studentsWithBMI.length} students...</p>
+        <div style="background:#E2E8F0;border-radius:8px;height:10px;overflow:hidden">
+          <div id="bulk-progress-bar" style="height:100%;background:#1D9E75;border-radius:8px;transition:width 0.4s;width:0%"></div>
+        </div>
+        <p id="bulk-progress-text" style="font-size:12px;color:#64748B;margin-top:8px;text-align:center">Starting...</p>
+        <div id="bulk-student-list" style="margin-top:16px;max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:8px"></div>
+        <div id="bulk-done-actions" style="display:none;margin-top:20px;gap:10px;flex-direction:column">
+          <button class="auth-submit-btn" onclick="app.printAllPlans()">🖨️ Print All Plans</button>
+          <button style="background:#F0FDF4;color:#1D9E75;border:1.5px solid #1D9E75;border-radius:8px;padding:10px;font-weight:700;cursor:pointer" onclick="document.getElementById('bulk-modal').remove()">✓ Done</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    this.bulkPlanResults = [];
+    const listEl = document.getElementById('bulk-student-list');
+    const barEl  = document.getElementById('bulk-progress-bar');
+    const textEl = document.getElementById('bulk-progress-text');
+    for (let i = 0; i < studentsWithBMI.length; i++) {
+      const student = studentsWithBMI[i];
+      const bmi     = student.latest_bmi;
+      barEl.style.width = `${Math.round((i/studentsWithBMI.length)*100)}%`;
+      textEl.textContent = `Generating ${i+1} of ${studentsWithBMI.length}: ${student.name}...`;
+      const row = document.createElement('div');
+      row.id = `bulk-row-${student.id}`;
+      row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:8px;border:1px solid #FDE68A;background:#FFFBEB';
+      row.innerHTML = `<div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">${student.gender==='Girl'?'👧':'👦'}</span><strong>${student.name}</strong><span style="font-size:11px;color:#64748B">· ${bmi.status}</span></div><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#FEF3C7;color:#B45309">⏳ Generating...</span>`;
+      listEl.appendChild(row);
+      listEl.scrollTop = listEl.scrollHeight;
+      try {
+        const ageGroup = student.age<=8?'5-8':student.age<=12?'9-12':'13-15';
+        const resp = await fetch('/api/generate', {
+          method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'include',
+          body: JSON.stringify({ student_name: student.name, bmi_status: bmi.status, bmi_value: bmi.bmi, age_group: ageGroup, preference: 'Vegetarian', region: 'All', month: new Date().toLocaleString('default',{month:'long'}), optimization_strategy: bmi.status==='Underweight'?'high_protein':bmi.status==='Overweight'||bmi.status==='Obese'?'low_calorie':'standard' }),
+        });
+        const plan = await resp.json();
+        if (plan.error) throw new Error(plan.error);
+        this.bulkPlanResults.push({ student, bmi, plan });
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:8px;border:1px solid #BBF7D0;background:#F0FDF4';
+        row.innerHTML = `<div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">${student.gender==='Girl'?'👧':'👦'}</span><strong>${student.name}</strong><span style="font-size:11px;color:#64748B">· ${bmi.status} (BMI: ${bmi.bmi})</span></div><div style="display:flex;gap:6px;align-items:center"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#D1FAE5;color:#065F46">✅ Done</span><button style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;background:#1D9E75;color:white;border:none;cursor:pointer" onclick="app.viewBulkPlan(${this.bulkPlanResults.length-1})">View</button></div>`;
+      } catch (e) {
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:8px;border:1px solid #FECACA;background:#FEF2F2';
+        row.innerHTML = `<div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">${student.gender==='Girl'?'👧':'👦'}</span><strong>${student.name}</strong></div><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#FEE2E2;color:#991B1B">❌ Failed</span>`;
+      }
+      await new Promise(r => setTimeout(r, 400));
+    }
+    barEl.style.width = '100%';
+    barEl.style.background = '#10B981';
+    textEl.textContent = `✅ All ${studentsWithBMI.length} plans generated!`;
+    document.getElementById('bulk-done-actions').style.display = 'flex';
+  },
+
+  viewBulkPlan(index) {
+    const { student, bmi, plan } = this.bulkPlanResults[index];
+    this.lastPlanData = plan;
+    document.getElementById('bulk-modal')?.remove();
+    const schoolEl  = document.getElementById('school_name');
+    const teacherEl = document.getElementById('teacher_name');
+    const studentEl = document.getElementById('student_name');
+    const bmiEl     = document.getElementById('bmi_status_hidden');
+    if (schoolEl  && this.currentTeacher) schoolEl.value  = this.currentTeacher.school_name;
+    if (teacherEl && this.currentTeacher) teacherEl.value = this.currentTeacher.name;
+    if (studentEl) studentEl.value = student.name;
+    if (bmiEl)     bmiEl.value     = bmi.status;
+    this.renderPoster(plan);
+    this.navigateTo('generator');
+    document.getElementById('gen-success').style.display = 'flex';
+    document.getElementById('gen-empty').style.display   = 'none';
+    setTimeout(() => document.getElementById('gen-success').scrollIntoView({ behavior: 'smooth' }), 300);
+  },
+
+  printAllPlans() {
+    if (!this.bulkPlanResults?.length) return;
+    const printWin = window.open('', '_blank');
+    printWin.document.write(`<!DOCTYPE html><html><head><title>NutriPrint — All Class Meal Plans</title><style>body{font-family:sans-serif;margin:0;padding:0}.poster-page{page-break-after:always;padding:24px}.poster-header{background:#1D9E75;color:white;padding:16px 20px;border-radius:8px 8px 0 0;display:flex;justify-content:space-between;align-items:center}.poster-header h2{margin:0;font-size:18px}.student-badge{background:#F0FDF4;border:1.5px solid #1D9E75;border-radius:8px;padding:10px 16px;display:flex;gap:16px;align-items:center;margin:12px 0;font-size:13px}table{width:100%;border-collapse:collapse;font-size:11px;margin-top:12px}th{background:#1D9E75;color:white;padding:6px 8px;text-align:left}td{border:1px solid #E2E8F0;padding:6px 8px;vertical-align:top}tr:nth-child(even) td{background:#F8FAFC}@media print{.poster-page{page-break-after:always}}</style></head><body>`);
+    this.bulkPlanResults.forEach(({ student, bmi, plan }) => {
+      const bmiColor = bmi.status==='Normal'?'#10B981':bmi.status==='Underweight'?'#F59E0B':'#EF4444';
+      const days=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const slots=['breakfast','lunch','snack','dinner'];
+      let tableRows = '';
+      slots.forEach(slot => {
+        tableRows += `<tr><td><strong>${slot}</strong></td>`;
+        days.forEach(day => { tableRows += `<td>${plan.meal_plan?.[day]?.[slot]?.name_en || '—'}</td>`; });
+        tableRows += '</tr>';
+      });
+      printWin.document.write(`<div class="poster-page"><div class="poster-header"><div><h2>NutriPrint Weekly Meal Plan</h2><p>${plan.school_details?.school_name||''} · ${plan.school_details?.month||''} 2026</p></div><div style="text-align:right;font-size:12px"><div>Teacher: ${plan.school_details?.teacher_name||''}</div></div></div><div class="student-badge"><span style="font-size:24px">${student.gender==='Girl'?'👧':'👦'}</span><div><strong style="font-size:15px">${student.name}</strong><div style="font-size:12px;color:#64748B">Age: ${student.age} · ${student.gender}</div></div><span style="padding:3px 10px;border-radius:20px;font-weight:700;font-size:12px;background:${bmiColor}20;color:${bmiColor}">${bmi.status} · BMI: ${bmi.bmi}</span></div><table><thead><tr><th>Meal</th>${days.map(d=>`<th>${d}</th>`).join('')}</tr></thead><tbody>${tableRows}</tbody></table></div>`);
+    });
+    printWin.document.write('</body></html>');
+    printWin.document.close();
+    setTimeout(() => printWin.print(), 500);
+  },
+
+  // ── AI Advisor ────────────────────────────────────────────
   showAIAdvisorPanel(name, age, gender, bmiStatus, bmiValue, preference, region) {
     let panel = document.getElementById('ai-advisor-panel');
-
     if (!panel) {
       panel = document.createElement('div');
-      panel.id        = 'ai-advisor-panel';
+      panel.id = 'ai-advisor-panel';
       panel.className = 'ai-advisor-panel';
       panel.innerHTML = `
         <div class="ai-advisor-header">
@@ -1149,15 +1370,14 @@ const app = {
             <span class="ai-icon">🤖</span>
             <div>
               <h3>NutriPrint AI Advisor</h3>
-              <p>Powered by Gemini AI • ಕರ್ನಾಟಕ ಪೌಷ್ಟಿಕಾಂಶ ಸಲಹೆಗಾರ</p>
+              <p>Powered by Groq AI • ಕರ್ನಾಟಕ ಪೌಷ್ಟಿಕಾಂಶ ಸಲಹೆಗಾರ</p>
             </div>
           </div>
-          <button class="ai-advisor-close"
-            onclick="document.getElementById('ai-advisor-panel').style.display='none'">✕</button>
+          <button class="ai-advisor-close" onclick="document.getElementById('ai-advisor-panel').style.display='none'">✕</button>
         </div>
         <div class="ai-advisor-body">
           <div class="ai-advisor-context" id="ai-context-box"></div>
-          <div class="ai-chat-area">
+          <div class="ai-chat-area" id="ai-chat-area">
             <div class="ai-thinking" id="ai-thinking" style="display:none;">
               <div class="thinking-dots"><span></span><span></span><span></span></div>
               <p>AI is thinking...</p>
@@ -1169,8 +1389,7 @@ const app = {
             <div class="quick-q-chips" id="quick-q-chips"></div>
           </div>
           <div class="ai-input-row">
-            <input type="text" id="ai-question-input" class="ai-input"
-              placeholder="Ask about nutrition... (ಪ್ರಶ್ನೆ ಕೇಳಿ)">
+            <input type="text" id="ai-question-input" class="ai-input" placeholder="Ask about nutrition, foods, serving sizes... (ಪ್ರಶ್ನೆ ಕೇಳಿ)">
             <button class="ai-send-btn" onclick="app.askAI()">Ask AI ⚡</button>
           </div>
         </div>
@@ -1178,131 +1397,102 @@ const app = {
       const bmiSection = document.getElementById('bmi-section');
       if (bmiSection) bmiSection.appendChild(panel);
     }
-
     panel.style.display = 'block';
-    panel.dataset.name      = name;
-    panel.dataset.age       = age;
-    panel.dataset.gender    = gender;
-    panel.dataset.bmiStatus = bmiStatus;
-    panel.dataset.bmiValue  = bmiValue;
+    panel.dataset.name       = name;
+    panel.dataset.age        = age;
+    panel.dataset.gender     = gender;
+    panel.dataset.bmiStatus  = bmiStatus;
+    panel.dataset.bmiValue   = bmiValue;
     panel.dataset.preference = preference;
-    panel.dataset.region    = region;
-
-    const statusColor = bmiStatus === 'Normal' ? '#10B981'
-      : bmiStatus === 'Underweight'             ? '#F59E0B'
-      : '#EF4444';
-
-    document.getElementById('ai-context-box').innerHTML = `
-      <strong>${name || 'Student'}</strong> • Age: ${age} • ${gender} •
-      BMI: <span style="color:${statusColor}">${bmiStatus} (${bmiValue})</span>
-    `;
-
+    panel.dataset.region     = region;
+    const statusColor = bmiStatus === 'Normal' ? '#10B981' : bmiStatus === 'Underweight' ? '#F59E0B' : '#EF4444';
+    document.getElementById('ai-context-box').innerHTML = `<strong>${name||'Student'}</strong> • Age: ${age} • ${gender} • BMI: <span style="color:${statusColor}">${bmiStatus} (${bmiValue})</span>`;
     const quickQs = bmiStatus === 'Underweight'
       ? ['What foods help gain weight?', 'Best protein foods for kids?', 'How much should child eat daily?']
       : bmiStatus === 'Normal'
       ? ['What maintains healthy weight?', 'Best Karnataka foods for kids?', 'How much water daily?']
       : ['What foods to avoid?', 'Best low-calorie meals?', 'How to reduce junk food?'];
-
     const chipsEl = document.getElementById('quick-q-chips');
     chipsEl.innerHTML = '';
     quickQs.forEach(q => {
       const chip = document.createElement('button');
-      chip.className  = 'quick-q-chip';
+      chip.className = 'quick-q-chip';
       chip.textContent = q;
-      chip.onclick    = () => {
-        document.getElementById('ai-question-input').value = q;
-        app.askAI();
-      };
+      chip.onclick = () => { document.getElementById('ai-question-input').value = q; app.askAI(); };
       chipsEl.appendChild(chip);
     });
-
-    setTimeout(() => this.askAI(''), 300);
+    setTimeout(() => this.(''), 300);
   },
 
-  async askAI(customQuestion) {
+  async (customQuestion) {
     const panel = document.getElementById('ai-advisor-panel');
     if (!panel) return;
-
-    const question = customQuestion !== undefined
-      ? customQuestion
-      : (document.getElementById('ai-question-input')?.value?.trim() || '');
-
+    const question   = customQuestion !== undefined ? customQuestion : (document.getElementById('ai-question-input')?.value?.trim() || '');
     const thinkingEl = document.getElementById('ai-thinking');
     const replyBox   = document.getElementById('ai-reply-box');
-
     if (thinkingEl) thinkingEl.style.display = 'flex';
     if (replyBox)   replyBox.innerHTML = '';
-
     try {
       const resp = await fetch('/api/ai-advisor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          student_name: panel.dataset.name,
-          age:          panel.dataset.age,
-          gender:       panel.dataset.gender,
-          bmi_status:   panel.dataset.bmiStatus,
-          bmi_value:    panel.dataset.bmiValue,
-          preference:   panel.dataset.preference,
-          region:       panel.dataset.region,
-          question,
-        }),
+        body: JSON.stringify({ student_name: panel.dataset.name, age: panel.dataset.age, gender: panel.dataset.gender, bmi_status: panel.dataset.bmiStatus, bmi_value: panel.dataset.bmiValue, preference: panel.dataset.preference, region: panel.dataset.region, question }),
       });
-
       const data = await resp.json();
       if (thinkingEl) thinkingEl.style.display = 'none';
-
       if (replyBox) {
-        replyBox.innerHTML = `
-          <div class="ai-reply-card">
-            <div class="ai-reply-icon">🤖</div>
-            <div class="ai-reply-text">
-              ${(data.reply || '').replace(/\n/g, '<br>')}
-            </div>
-          </div>
-        `;
-      }
-
+  const replyId = `ai-reply-${Date.now()}`;
+  replyBox.innerHTML = `
+    <div class="ai-reply-card">
+      <div class="ai-reply-icon">🤖</div>
+      <div style="flex:1">
+        <div class="ai-reply-text" id="${replyId}">
+          ${(data.reply || '').replace(/\n/g, '<br>')}
+        </div>
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid #E2E8F0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:11px;color:#64748B">Add this advice to meal plan poster?</span>
+          <button onclick="app.addAIAdviceToPlanner('${replyId}')"
+            style="background:#1D9E75;color:white;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">
+            ✅ Yes, Add to Poster
+          </button>
+          <button onclick="this.parentElement.remove()"
+            style="background:#F1F5F9;color:#64748B;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">
+            ✕ No
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
       const input = document.getElementById('ai-question-input');
       if (input) input.value = '';
-
     } catch (err) {
       if (thinkingEl) thinkingEl.style.display = 'none';
-      if (replyBox) {
-        replyBox.innerHTML = `
-          <div class="ai-reply-card">
-            <div class="ai-reply-text">AI Advisor is temporarily unavailable.</div>
-          </div>
-        `;
-      }
+      if (replyBox) replyBox.innerHTML = `<div class="ai-reply-card"><div class="ai-reply-text">AI Advisor is temporarily unavailable. Please try again.</div></div>`;
     }
   },
 
-  // ════════════════════════════════════════════════════════
-  // UTILITY: Toast notifications
-  // ════════════════════════════════════════════════════════
+  // ── Toast ─────────────────────────────────────────────────
   showToast(message) {
     let toast = document.getElementById('nutriprint-toast');
     if (!toast) {
       toast = document.createElement('div');
       toast.id = 'nutriprint-toast';
-      toast.className = 'nutriprint-toast';
+      toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1A1A2E;color:white;padding:12px 24px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);transition:opacity 0.3s;';
       document.body.appendChild(toast);
     }
     toast.textContent = message;
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 3000);
+    toast.style.opacity = '1';
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 3000);
   },
 };
 
-// ============================================================
-// CSS — All new styles injected
-// ============================================================
+// ── Styles ─────────────────────────────────────────────────
 (function injectStyles() {
   const css = `
-    /* ── Poster cells ────────────────────────────────────── */
     .food-emoji { font-size: 20px; margin-bottom: 2px; }
-    .food-name-en { font-size: 9px; font-weight: 700; color: #1A1A2E; line-height: 1.2; }
+    .food-name-en { font-size: 9px; font-weight: 700; color: var(--dark, #1A1A2E); line-height: 1.2; }
     .food-name-kn { font-size: 7.5px; color: #64748B; line-height: 1.2; margin-bottom: 2px; }
     .food-nutrition-row { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 3px; font-size: 7px; font-weight: 600; }
     .food-nutrition-row span { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 3px; padding: 1px 3px; color: #166534; }
@@ -1318,116 +1508,37 @@ const app = {
     .summary-row strong { color: #1D9E75; }
     .summary-cost { font-size: 9px; font-weight: 700; color: #B45309; margin-top: 2px; }
     .no-meal { color: #CBD5E1; font-size: 16px; }
-
-    /* ── QR Box ──────────────────────────────────────────── */
-    .qr-box { text-align: center; padding: 12px; background: white; border-radius: 8px; border: 1px solid #E2E8F0; }
+    .qr-box { text-align: center; padding: 12px; background: white; border-radius: 8px; border: 1px solid #E2E8F0; display: inline-block; margin: 0 auto 12px; }
     .qr-label { font-size: 10px; color: #64748B; margin-top: 6px; }
     .qr-code-text { font-size: 11px; font-weight: 700; color: #1D9E75; margin-top: 4px; letter-spacing: 2px; }
-
-    /* ── Auth Modal ──────────────────────────────────────── */
-    .auth-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-    .auth-modal-box { background: white; border-radius: 20px; padding: 32px; width: 90%; max-width: 400px; position: relative; max-height: 90vh; overflow-y: auto; }
-    .auth-modal-close { position: absolute; top: 16px; right: 16px; background: #F1F5F9; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 14px; }
-    .auth-modal-header { text-align: center; margin-bottom: 24px; }
-    .auth-logo { font-size: 40px; margin-bottom: 8px; }
-    .auth-modal-header h2 { font-size: 22px; font-weight: 800; color: #1A1A2E; margin: 0; }
-    .auth-modal-header p { font-size: 12px; color: #64748B; margin: 4px 0 0; }
-    .auth-tabs { display: flex; gap: 4px; background: #F1F5F9; border-radius: 10px; padding: 4px; margin-bottom: 24px; }
-    .auth-tab { flex: 1; padding: 8px; border: none; background: transparent; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; color: #64748B; transition: all 0.2s; }
-    .auth-tab.active { background: white; color: #1D9E75; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    .auth-field { margin-bottom: 14px; }
-    .auth-field label { font-size: 12px; font-weight: 700; color: #475569; display: block; margin-bottom: 6px; }
-    .auth-field input, .auth-field select { width: 100%; padding: 10px 14px; border: 1.5px solid #E2E8F0; border-radius: 8px; font-size: 13px; outline: none; box-sizing: border-box; transition: border-color 0.2s; }
-    .auth-field input:focus, .auth-field select:focus { border-color: #1D9E75; }
-    .auth-error { background: #FEE2E2; color: #DC2626; padding: 10px 14px; border-radius: 8px; font-size: 12px; margin-bottom: 12px; }
-    .auth-submit-btn { width: 100%; padding: 12px; background: linear-gradient(135deg,#1D9E75,#15796A); color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 12px; transition: opacity 0.2s; }
-    .auth-submit-btn:hover { opacity: 0.9; }
-    .auth-switch { text-align: center; font-size: 12px; color: #64748B; }
-    .auth-switch a { color: #1D9E75; font-weight: 600; }
-
-    /* ── Nav auth elements ───────────────────────────────── */
-    .nav-teacher-info { display: flex; align-items: center; gap: 8px; }
-    .nav-teacher-name { font-size: 13px; font-weight: 600; color: #1D9E75; }
-    .nav-logout-btn { background: #FEE2E2; color: #DC2626; border: none; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer; }
-    .nav-login-btn { background: #1D9E75; color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
-
-    /* ── Teacher welcome banner ──────────────────────────── */
-    .teacher-welcome-banner { background: linear-gradient(135deg,#F0FDF4,#DCFCE7); border: 1px solid #BBF7D0; border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; font-size: 13px; color: #166534; }
-    .banner-dash-btn { background: #1D9E75; color: white; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
-
-    /* ── Dashboard ───────────────────────────────────────── */
-    .dashboard-wrapper { padding: 24px; max-width: 1200px; margin: 0 auto; }
-    .dashboard-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
-    .dashboard-header h2 { font-size: 22px; font-weight: 800; color: #1A1A2E; margin: 0; }
-    .dashboard-header p { font-size: 13px; color: #64748B; margin: 4px 0 0; }
-    .add-student-btn { background: linear-gradient(135deg,#1D9E75,#15796A); color: white; border: none; border-radius: 10px; padding: 10px 20px; font-size: 13px; font-weight: 700; cursor: pointer; }
-    .dashboard-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 24px; }
-    .stat-card { background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-    .stat-num { font-size: 32px; font-weight: 800; }
-    .stat-label { font-size: 12px; color: #64748B; margin-top: 4px; }
-    .total-card .stat-num { color: #1D9E75; }
-    .normal-card .stat-num { color: #10B981; }
-    .under-card .stat-num { color: #F59E0B; }
-    .over-card .stat-num { color: #EF4444; }
-    .students-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: 16px; }
-    .student-card { background: white; border-radius: 12px; padding: 16px; border: 1px solid #E2E8F0; }
-    .student-card-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-    .student-avatar { font-size: 32px; }
-    .student-info { flex: 1; }
-    .student-info h4 { font-size: 14px; font-weight: 700; color: #1A1A2E; margin: 0; }
-    .student-info p { font-size: 12px; color: #64748B; margin: 2px 0 0; }
-    .student-delete-btn { background: none; border: none; cursor: pointer; font-size: 16px; opacity: 0.5; }
-    .student-delete-btn:hover { opacity: 1; }
-    .student-bmi-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-    .bmi-status-tag { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
-    .bmi-value-tag { font-size: 11px; color: #64748B; }
-    .sparkline-label { font-size: 10px; color: #94A3B8; margin-bottom: 4px; }
-    .student-card-actions { display: flex; gap: 8px; margin-top: 12px; }
-    .btn-measure, .btn-generate { flex: 1; padding: 8px; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: opacity 0.2s; }
-    .btn-measure { background: #EFF6FF; color: #3B82F6; }
-    .btn-generate { background: #F0FDF4; color: #1D9E75; }
-    .btn-measure:hover, .btn-generate:hover { opacity: 0.8; }
-    .empty-students { text-align: center; padding: 48px; color: #64748B; }
-    @media(max-width:600px) { .dashboard-stats { grid-template-columns: repeat(2,1fr); } }
-
-    /* ── Recipe cards in library ─────────────────────────── */
-    .food-card { display: flex; gap: 16px; background: white; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; transition: box-shadow 0.2s; margin-bottom: 16px; }
+    .food-card { display: flex; gap: 16px; background: white; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; transition: box-shadow 0.2s; margin-bottom: 12px; }
     .food-card:hover { box-shadow: 0 4px 16px rgba(29,158,117,0.12); }
     .food-card-emoji { font-size: 40px; flex-shrink: 0; width: 56px; text-align: center; }
     .food-card-body { flex: 1; }
-    .food-card-body h4 { font-size: 14px; font-weight: 700; color: #1A1A2E; margin-bottom: 8px; }
+    .food-card-body h4 { font-size: 14px; font-weight: 700; color: #1A1A2E; margin-bottom: 4px; }
     .kn-name { font-size: 12px; font-weight: 400; color: #64748B; }
-    .food-card-macros { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .food-card-desc { font-size: 12px; color: #64748B; margin-bottom: 10px; line-height: 1.5; }
+    .food-card-macros { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
     .macro-pill { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 6px; padding: 3px 8px; }
     .macro-pill .macro-label { font-size: 9px; font-weight: 700; color: #64748B; display: block; }
     .macro-pill .macro-val { font-size: 12px; font-weight: 700; color: #1D9E75; }
     .cost-pill { background: #FEF3C7; border-color: #FDE68A; }
     .cost-pill .macro-val { color: #B45309; }
-    .recipe-section { margin-top: 12px; }
-    .recipe-title { font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .recipe-ingredients { font-size: 12px; color: #64748B; line-height: 1.5; background: #F8FAFC; border-radius: 6px; padding: 8px; }
-    .recipe-steps { display: flex; flex-direction: column; gap: 4px; }
-    .recipe-step { display: flex; gap: 8px; font-size: 12px; color: #475569; line-height: 1.5; }
-    .step-num { background: #1D9E75; color: white; width: 18px; height: 18px; border-radius: 50%; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
-    .recipe-tip { font-size: 12px; color: #64748B; font-style: italic; line-height: 1.5; }
-    .recipe-tip.kn { margin-top: 4px; color: #94A3B8; }
-    .food-card-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .food-card-tags { display: flex; gap: 6px; flex-wrap: wrap; }
     .tag { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
     .cat-tag { background: #EFF6FF; color: #3B82F6; }
     .veg-tag { background: #F0FDF4; color: #16A34A; }
     .egg-tag { background: #FFFBEB; color: #D97706; }
-    @media(max-width:600px) { .food-card { flex-direction: column; } }
-
-    /* ── AI Advisor ──────────────────────────────────────── */
     .ai-advisor-panel { margin: 24px; border-radius: 16px; border: 2px solid #1D9E75; background: linear-gradient(135deg,#F0FDF9,#ECFDF5); box-shadow: 0 8px 32px rgba(29,158,117,0.15); overflow: hidden; }
     .ai-advisor-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: linear-gradient(135deg,#1D9E75,#15796A); }
     .ai-advisor-title { display: flex; align-items: center; gap: 12px; }
     .ai-icon { font-size: 28px; }
     .ai-advisor-title h3 { font-size: 16px; font-weight: 700; color: white; margin: 0; }
     .ai-advisor-title p { font-size: 11px; color: rgba(255,255,255,0.8); margin: 0; }
-    .ai-advisor-close { background: rgba(255,255,255,0.2); border: none; color: white; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 14px; }
+    .ai-advisor-close { background: rgba(255,255,255,0.2); border: none; color: white; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
     .ai-advisor-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
     .ai-advisor-context { background: white; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #475569; border: 1px solid #E2E8F0; }
+    .ai-chat-area { min-height: 80px; }
     .ai-thinking { display: flex; align-items: center; gap: 10px; padding: 12px 0; }
     .thinking-dots { display: flex; gap: 4px; }
     .thinking-dots span { width: 8px; height: 8px; border-radius: 50%; background: #1D9E75; animation: bounce 1.2s infinite; }
@@ -1446,16 +1557,68 @@ const app = {
     .ai-input:focus { border-color: #1D9E75; }
     .ai-send-btn { background: #1D9E75; color: white; border: none; border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: background 0.2s; }
     .ai-send-btn:hover { background: #15796A; }
-
-    /* ── Toast ───────────────────────────────────────────── */
-    .nutriprint-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: #1A1A2E; color: white; padding: 12px 24px; border-radius: 30px; font-size: 13px; font-weight: 600; z-index: 9999; transition: transform 0.3s; pointer-events: none; white-space: nowrap; }
-    .nutriprint-toast.show { transform: translateX(-50%) translateY(0); }
-
-    /* ── Mobile ──────────────────────────────────────────── */
-    @media(max-width:600px) {
-      .ai-input-row { flex-direction: column; }
-      .quick-q-chips { gap: 4px; }
-    }
+    .dashboard-wrapper { padding: 24px; max-width: 1200px; margin: 0 auto; }
+    .dashboard-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+    .dashboard-header h2 { font-size: 22px; font-weight: 800; color: #1A1A2E; margin: 0; }
+    .dashboard-header p { font-size: 13px; color: #64748B; margin: 4px 0 0; }
+    .add-student-btn { background: linear-gradient(135deg,#1D9E75,#15796A); color: white; border: none; border-radius: 10px; padding: 10px 20px; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .dashboard-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #E2E8F0; }
+    .stat-num { font-size: 32px; font-weight: 800; }
+    .stat-label { font-size: 12px; color: #64748B; margin-top: 4px; }
+    .total-card .stat-num { color: #1D9E75; }
+    .normal-card .stat-num { color: #10B981; }
+    .under-card .stat-num { color: #F59E0B; }
+    .over-card .stat-num { color: #EF4444; }
+    .students-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: 16px; }
+    .student-card { background: white; border-radius: 12px; padding: 16px; border: 1px solid #E2E8F0; transition: box-shadow 0.2s; }
+    .student-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+    .student-card-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .student-avatar { font-size: 32px; }
+    .student-info { flex: 1; }
+    .student-info h4 { font-size: 14px; font-weight: 700; color: #1A1A2E; margin: 0; }
+    .student-info p { font-size: 12px; color: #64748B; margin: 2px 0 0; }
+    .student-delete-btn { background: none; border: none; cursor: pointer; font-size: 16px; opacity: 0.4; transition: opacity 0.2s; }
+    .student-delete-btn:hover { opacity: 1; }
+    .student-bmi-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .bmi-status-tag { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+    .bmi-value-tag { font-size: 11px; color: #64748B; }
+    .sparkline-label { font-size: 10px; color: #94A3B8; margin-bottom: 4px; }
+    .sparkline-container { margin-bottom: 10px; }
+    .student-card-actions { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+    .btn-measure, .btn-generate, .btn-chart { flex: 1; padding: 8px 4px; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; }
+    .btn-measure  { background: #EFF6FF; color: #3B82F6; }
+    .btn-generate { background: #F0FDF4; color: #1D9E75; }
+    .btn-chart    { background: #F5F3FF; color: #7C3AED; }
+    .btn-measure:hover, .btn-generate:hover, .btn-chart:hover { opacity: 0.8; }
+    .empty-students { text-align: center; padding: 48px; color: #64748B; grid-column: 1/-1; }
+    .auth-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(4px); }
+    .auth-modal-box { background: white; border-radius: 20px; padding: 32px; width: 90%; max-width: 400px; position: relative; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .auth-modal-close { position: absolute; top: 16px; right: 16px; background: #F1F5F9; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 14px; }
+    .auth-modal-header { text-align: center; margin-bottom: 24px; }
+    .auth-logo { font-size: 40px; margin-bottom: 8px; }
+    .auth-modal-header h2 { font-size: 22px; font-weight: 800; color: #1A1A2E; margin: 0; }
+    .auth-modal-header p { font-size: 12px; color: #64748B; margin: 4px 0 0; }
+    .auth-tabs { display: flex; gap: 4px; background: #F1F5F9; border-radius: 10px; padding: 4px; margin-bottom: 24px; }
+    .auth-tab { flex: 1; padding: 8px; border: none; background: transparent; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; color: #64748B; transition: all 0.2s; }
+    .auth-tab.active { background: white; color: #1D9E75; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .auth-field { margin-bottom: 14px; }
+    .auth-field label { font-size: 12px; font-weight: 700; color: #475569; display: block; margin-bottom: 6px; }
+    .auth-field input, .auth-field select { width: 100%; padding: 10px 14px; border: 1.5px solid #E2E8F0; border-radius: 8px; font-size: 13px; outline: none; box-sizing: border-box; transition: border-color 0.2s; font-family: inherit; }
+    .auth-field input:focus, .auth-field select:focus { border-color: #1D9E75; }
+    .auth-error { background: #FEE2E2; color: #DC2626; padding: 10px 14px; border-radius: 8px; font-size: 12px; margin-bottom: 12px; }
+    .auth-submit-btn { width: 100%; padding: 12px; background: linear-gradient(135deg,#1D9E75,#15796A); color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 12px; transition: opacity 0.2s; font-family: inherit; }
+    .auth-submit-btn:hover { opacity: 0.9; }
+    .auth-switch { text-align: center; font-size: 12px; color: #64748B; }
+    .auth-switch a { color: #1D9E75; font-weight: 600; cursor: pointer; }
+    .nav-teacher-info { display: flex; align-items: center; gap: 8px; }
+    .nav-teacher-name { font-size: 13px; font-weight: 600; color: #1D9E75; }
+    .nav-logout-btn { background: #FEE2E2; color: #DC2626; border: none; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .nav-login-btn { background: #1D9E75; color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .teacher-welcome-banner { background: linear-gradient(135deg,#F0FDF4,#DCFCE7); border: 1px solid #BBF7D0; border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #166534; flex-wrap: wrap; gap: 8px; }
+    .banner-dash-btn { background: #1D9E75; color: white; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    @media(max-width:768px) { .dashboard-stats { grid-template-columns: repeat(2,1fr); } }
+    @media(max-width:600px) { .food-card { flex-direction: column; } .ai-input-row { flex-direction: column; } .student-card-actions { gap: 4px; } }
   `;
   const style = document.createElement('style');
   style.textContent = css;
