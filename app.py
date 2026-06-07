@@ -422,22 +422,70 @@ def get_saved_plans():
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/nutrition', methods=['GET'])
 def get_nutrition_library():
+    search_query = request.args.get('search', '').strip()
+    category = request.args.get('category', '').strip().lower()
+    preference = request.args.get('preference', '').strip().lower()
+    veg_only = request.args.get('veg_only', 'false').lower() == 'true'
+
     conn = get_db_connection()
-    cur = conn.cursor()
 
-    cur.execute("""
-        SELECT *
-        FROM foods
-        ORDER BY id
-    """)
+    try:
+        query = """
+            SELECT *
+            FROM foods
+            WHERE 1=1
+        """
+        params = []
 
-    rows = cur.fetchall()
+        # Search filter
+        if search_query:
+            query += """
+                AND (
+                    name_en ILIKE %s
+                    OR name_kn ILIKE %s
+                    OR category ILIKE %s
+                )
+            """
+            like = f"%{search_query}%"
+            params.extend([like, like, like])
 
-    print("DEBUG NUTRITION:", rows[:1])
+        # Category filter
+        if category and category != "all":
+            query += " AND LOWER(category) = %s"
+            params.append(category)
 
-    conn.close()
+        # Preference filter
+        if preference == "veg":
+            query += " AND is_veg = 1"
 
-    return jsonify(rows)
+        elif preference == "egg":
+            query += " AND is_egg = 1"
+
+        elif preference == "nonveg":
+            query += " AND is_veg = 0"
+
+        # Backward compatibility
+        if veg_only:
+            query += " AND is_veg = 1"
+
+        query += " ORDER BY id"
+
+        cur = conn.cursor()
+        cur.execute(query, params)
+        foods = cur.fetchall()
+
+        print(f"Category={category}")
+        print(f"Preference={preference}")
+        print(f"Foods found={len(foods)}")
+
+        return jsonify(foods)
+
+    except Exception as e:
+        print("Nutrition API Error:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        conn.close()
 
 # ═══════════════════════════════════════════════════════════
 # PHASE 4 — AI ADVISOR (Groq)
