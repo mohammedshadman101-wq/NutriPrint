@@ -421,68 +421,23 @@ def get_saved_plans():
 # NUTRITION LIBRARY
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/nutrition', methods=['GET'])
-
 def get_nutrition_library():
-    print("NUTRITION API HIT - VERSION 2")
-    search_query = request.args.get('search', '').strip()
-    category     = request.args.get('category', '').strip()
-    veg_only     = request.args.get('veg_only', 'false').lower() == 'true'
-
-    conn = get_db_connection()
-    try:
-        query  = "SELECT * FROM foods WHERE 1=1"
-        params = []
-
-        if search_query:
-            query += " AND (name_en ILIKE %s OR name_kn ILIKE %s)"
-            like = f"%{search_query}%"
-            params.extend([like, like])
-        if category:
-            query += " AND category = %s"
-            params.append(category)
-        if veg_only:
-            query += " AND is_veg = 1"
-
-        foods = db_fetchall(conn, query, params)
-        print("FOODS COUNT:", len(foods))
-        print("FIRST FOOD:", foods[0] if foods else "NONE")
-
-        return jsonify(foods)
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        conn.close()
-
-@app.route('/api/recipe/<int:food_id>', methods=['GET'])
-def get_recipe(food_id):
-    conn = get_db_connection()
-    try:
-        food = db_fetchone(conn, 'SELECT * FROM foods WHERE id = %s', (food_id,))
-    finally:
-        conn.close()
-
-    if not food:
-        return jsonify({'error': 'Not found'}), 404
-    return jsonify(food)
-
-@app.route('/api/debug-foods')
-def debug_foods():
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT id, name_en FROM foods LIMIT 20")
+
+    cur.execute("""
+        SELECT *
+        FROM foods
+        ORDER BY id
+    """)
+
     rows = cur.fetchall()
-    conn.close()
-    return jsonify(rows)
 
-@app.route('/api/debug-columns')
-def debug_columns():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM foods LIMIT 1")
-    row = cur.fetchone()
+    print("DEBUG NUTRITION:", rows[:1])
+
     conn.close()
-    return jsonify(row)
+
+    return jsonify(rows)
 
 # ═══════════════════════════════════════════════════════════
 # PHASE 4 — AI ADVISOR (Groq)
