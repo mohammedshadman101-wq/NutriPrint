@@ -422,6 +422,7 @@ def get_saved_plans():
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/nutrition', methods=['GET'])
 def get_nutrition_library():
+    print("NUTRITION API HIT - VERSION 2")
     search_query = request.args.get('search', '').strip()
     category     = request.args.get('category', '').strip()
     veg_only     = request.args.get('veg_only', 'false').lower() == 'true'
