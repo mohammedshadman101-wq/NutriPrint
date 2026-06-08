@@ -32,7 +32,7 @@ def init_db():
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS students (
         id SERIAL PRIMARY KEY,
-        teacher_id INTEGER NOT NULL REFERENCES teachers(id),
+        teacher_id INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         age INTEGER NOT NULL,
         gender TEXT NOT NULL
@@ -43,7 +43,7 @@ def init_db():
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS bmi_records (
         id SERIAL PRIMARY KEY,
-        student_id INTEGER NOT NULL REFERENCES students(id),
+        student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
         height REAL NOT NULL,
         weight REAL NOT NULL,
         bmi REAL NOT NULL,
@@ -57,7 +57,7 @@ def init_db():
     CREATE TABLE IF NOT EXISTS saved_plans (
         id SERIAL PRIMARY KEY,
         qr_code TEXT UNIQUE NOT NULL,
-        teacher_id INTEGER NOT NULL REFERENCES teachers(id),
+        teacher_id INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
         student_id INTEGER,
         plan_data TEXT NOT NULL,
         school_name TEXT NOT NULL,
@@ -73,8 +73,6 @@ def init_db():
     ''')
 
     # ── Foods ─────────────────────────────────────────────────
-    # Only seed if empty
-    cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_name='foods'")
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS foods (
         id SERIAL PRIMARY KEY,
@@ -99,6 +97,9 @@ def init_db():
         recipe_steps TEXT DEFAULT ''
     )
     ''')
+    
+    # Safely commit schema modifications before checking row count
+    conn.commit()
 
     # Seed foods only if table is empty
     cursor.execute("SELECT COUNT(*) as count FROM foods")
