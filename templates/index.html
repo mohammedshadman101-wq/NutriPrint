@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NutriPrint AI Enterprise — Automated Institutional Nutrition Matrix</title>
+    <!-- Combined Premium Theme Sheet -->
+    <link rel="stylesheet" href="../static/style.css">
+</head>
+<body>
+
+    <!-- Unified Enterprise Navigation Header -->
+    <header class="main-header">
+        <div class="header-container">
+            <div class="logo-block">
+                <div class="logo-icon">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#0F9F6E" stroke="#046C4E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M2 17L12 22L22 17" stroke="#0F9F6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M2 12L12 17L22 12" stroke="#0F9F6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <h1>NutriPrint <span class="text-gold">AI</span></h1>
+                    <p>Institutional Dietetics Management System</p>
+                </div>
+            </div>
+            
+            <nav>
+                <ul class="nav-menu" id="mainNav">
+                    <li><a class="nav-link active" data-target="home-section">Home</a></li>
+                    <li><a class="nav-link" data-target="generator-section">Menu Blueprint Engine</a></li>
+                    <li><a class="nav-link" data-target="dashboard-section">Health Analytics</a></li>
+                    <li><a class="nav-link" data-target="library-section">Macro Inventory</a></li>
+                    <li><a class="nav-link" data-target="about-section">System Registry</a></li>
+                </ul>
+            </nav>
+
+            <button class="header-btn" id="headerCtaBtn" data-target="generator-section">
+                <span>Launch Planner Engine</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <!-- ==========================================
+           1. ENTERPRISE LANDING SEGMENT (HOME)
+           ========================================== -->
+        <section id="home-section" class="app-section active">
+            <div class="hero-banner">
+                <div class="container hero-content">
+                    <div class="hero-badge">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        <span>Enterprise Grade Health & Infrastructure Matrix Ready</span>
+                    </div>
+                    <h2>Automated Dietetic Compliance & <br><span>Predictive Health Delivery</span></h2>
+                    <p class="hero-subtitle">Next-generation workspace optimized for massive multi-tier institutional menu tracking, AI nutritional compliance routing, and student health metric visualizations.</p>
+                    <div class="hero-ctas">
+                        <button class="btn-primary navigate-btn" data-target="generator-section">Initialize Menu Matrix</button>
+                        <button class="btn-secondary navigate-btn" data-target="dashboard-section">View Health Analytics</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Snapshot KPIs -->
+            <div class="container">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-eyebrow">Active Intake Capacity</div>
+                        <div class="stat-number">4,280<span class="stat-unit">/mo</span></div>
+                        <p>Total children mapped across active regional institutions.</p>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-eyebrow">AI Caloric Target Alignment</div>
+                        <div class="stat-number">98.4<span class="stat-unit">%</span></div>
+                        <p>Dynamic structural compliance accuracy with institutional diet directives.</p>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-eyebrow">Severe Tracked Profiles</div>
+                        <div class="stat-number">3.2<span class="stat-unit">%</span></div>
+                        <p>Critical monitoring priority cases mapped automatically to specialized intervention.</p>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-eyebrow">Vector Layout Prints Executed</div>
+                        <div class="stat-number">12.8<span class="stat-unit">k</span></div>
+                        <p>Clean multi-page asset vectors delivered directly to distribution pipelines.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+           2. AUTOMATED GENERATOR & LIVE PREVIEW ENGINE
+           ========================================== -->
+        <section id="generator-section" class="app-section">
+            <div class="container generator-layout">
+                <!-- Parameters Dashboard Controls Form -->
+                <div class="form-panel">
+                    <h3 style="margin-bottom: 1.5rem; font-size: 1.25rem;">Matrix Controls</h3>
+                    <form id="blueprintEngineForm">
+                        <div class="form-group">
+                            <label for="institutionName">Target Institutional Body</label>
+                            <input type="text" id="institutionName" class="form-control" placeholder="e.g., Central District Cohort Alpha" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="targetAgeGroup">Age Scale Tier Bracket</label>
+                            <select id="targetAgeGroup" class="form-control">
+                                <option value="t1">Early Development Scale (Ages 3-6)</option>
+                                <option value="t2">Primary Education Cluster (Ages 6-12)</option>
+                                <option value="t3">Advanced Secondary Bracket (Ages 12-16)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="dietaryProfile">Nutritional Track Rule Profile</label>
+                            <select id="dietaryProfile" class="form-control">
+                                <option value="standard-veg">Strict Balanced Plant-Based Standard</option>
+                                <option value="high-protein">Enriched Micro-Nutrient Focused</option>
+                                <option value="therapeutic">Direct Intervention Protocol (Deficiency Tiers)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="operatingBudget">Operating Budget Tier Range <span>(Per Capita Daily)</span></label>
+                            <input type="number" id="operatingBudget" class="form-control" value="45" min="20" max="250">
+                        </div>
+                        <button type="submit" class="btn-primary btn-generate">Compile Optimization Matrix</button>
+                    </form>
+                </div>
+
+                <!-- High-Fidelity Rendering Space Workspace View -->
+                <div class="preview-panel">
+                    <div class="preview-header">
+                        <div class="preview-title">
+                            <span class="status-dot active"></span>
+                            <span>Vector Compilation Matrix Sandbox</span>
+                        </div>
+                        <button class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;" onclick="window.print()">
+                            Export A4 Layout Sheet
+                        </button>
+                    </div>
+
+                    <!-- Target Print Pipeline Base Wrapper Frame -->
+                    <div class="poster-container-scroll" id="posterPrintWrapper">
+                        <div class="a4-poster" id="livePosterAsset">
+                            <div class="poster-header">
+                                <div class="poster-header-left">
+                                    <h2 id="renderInstitutionTitle">INSTITUTIONAL BODY COHORT</h2>
+                                </div>
+                                <div style="text-align: right;">
+                                    <h4 style="color: var(--primary-dark);">NUTRI-MATRIX ENGINE v4.0</h4>
+                                    <p style="font-size: 0.75rem; color: var(--text-muted);">AI Optimized Production Sheet</p>
+                                </div>
+                            </div>
+
+                            <!-- Live Structured Target CSS Array Blueprint Grid Container -->
+                            <div class="poster-grid" id="posterWeeklyGridTarget">
+                                <!-- Base Header Columns (Assigned dynamically via JS execution layer) -->
+                                <div class="grid-cell grid-header-cell">Operational Vector</div>
+                                <div class="grid-cell grid-header-cell">Monday</div>
+                                <div class="grid-cell grid-header-cell">Tuesday</div>
+                                <div class="grid-cell grid-header-cell">Wednesday</div>
+                                <div class="grid-cell grid-header-cell">Thursday</div>
+                                <div class="grid-cell grid-header-cell">Friday</div>
+                                <div class="grid-cell grid-header-cell">Saturday</div>
+                                
+                                <!-- Populated Rows injection target placeholder slots -->
+                            </div>
+
+                            <div style="border-top: 2px solid var(--text-main); padding-top: 1rem; display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
+                                <p>Operational Compliance Protocol: ISO-9001 / National Dietary Baseline Verification Confirmed.</p>
+                                <p>System Authenticated: <strong>NutriPrint AI Secure Core</strong></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+           3. FULL-SUITE ADMINISTRATION DASHBOARD
+           ========================================== -->
+        <section id="dashboard-section" class="app-section">
+            <div class="container dashboard-grid-layout">
+                <!-- Comprehensive Student Health Registry Workspace Table Component -->
+                <div class="students-table-card">
+                    <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-smooth); display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="font-size: 1.25rem;">Active Monitoring Health Registry Tiers</h3>
+                        <button class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;" id="registerStudentBtn">Enroll Profile Record</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="dashboard-table">
+                            <thead>
+                                <tr>
+                                    <th>Profile Identifier</th>
+                                    <th>Age Scale</th>
+                                    <th>Current Height</th>
+                                    <th>Current Mass</th>
+                                    <th>BMI Vector Scale</th>
+                                    <th>System Directive Assessment Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="studentMetricsTableBody">
+                                <!-- Fallback Core Hardcode Seed Values For Quick Rendering Check Execution -->
+                                <tr>
+                                    <td><strong>#NP-9402</strong></td>
+                                    <td>8 Years</td>
+                                    <td>124.2 cm</td>
+                                    <td>21.4 kg</td>
+                                    <td>13.88 $kg/m^2$</td>
+                                    <td><span class="status-pill status-pill--normal">Target Optimum Nominal</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>#NP-9403</strong></td>
+                                    <td>9 Years</td>
+                                    <td>128.0 cm</td>
+                                    <td>19.8 kg</td>
+                                    <td>12.08 $kg/m^2$</td>
+                                    <td><span class="status-pill status-pill--wasted">Moderate Malnutrition Scale</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Live Dynamic Chart Integration Analytics Component Vector Panel -->
+                <div class="metrics-panel-box">
+                    <h3 style="font-size: 1.15rem; margin-bottom: 1rem;">Aggregated Regional Cluster Status Mapping</h3>
+                    <div class="chart-wrapper-container" id="chartTargetWorkspace">
+                        <!-- Dynamic Canvas Component Node Placement -->
+                        <p style="color: var(--text-muted); font-size: 0.875rem;">Chart Engine Mapping Sandbox Buffer Placeholder</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+           4. MACRO INVENTORY WAREHOUSE / HEALTH RESOURCE LIBRARY
+           ========================================== -->
+        <section id="library-section" class="app-section">
+            <div class="container" style="padding: 4rem 0;">
+                <div style="margin-bottom: 2.5rem;">
+                    <h2 style="font-size: 2rem; margin-bottom: 0.5rem;">Macro Component Profile Inventory Library</h2>
+                    <p style="color: var(--text-muted);">Real-time verification indices of functional raw material components, macro tracking properties, and dynamic allergen tracking criteria indices.</p>
+                </div>
+                <!-- Dynamic Target Layout Grid Matrix Display Area -->
+                <div class="container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2rem; padding: 0;" id="libraryInventoryGridTarget">
+                    <!-- Populated dynamically via JS arrays tracking resource definitions -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+           5. SYSTEM REGISTRY (ABOUT & TEAM META METRICS)
+           ========================================== -->
+        <section id="about-section" class="app-section">
+            <div class="container" style="padding: 5rem 0;">
+                <div style="max-width: 760px; margin: 0 auto; text-align: center;">
+                    <h2 style="font-size: 2.5rem; margin-bottom: 1.5rem;">System Architecture Mapping Specifications</h2>
+                    <p style="color: var(--text-muted); font-size: 1.1rem; margin-bottom: 3rem;">NutriPrint AI leverages a robust computational approach to institutional diet planning, integrating global health indicators with localized food supply metrics.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Global Application Core Dynamic Logic Controller Engine Link -->
+    <script src="../static/app.js"></script>
+</body>
+</html>
