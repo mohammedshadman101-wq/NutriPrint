@@ -107,7 +107,7 @@ def generate_weekly_meal_plan(school_name, teacher_name, age_group, preference, 
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
     days_kn = {
         "Monday": "ಸೋಮವಾರ", "Tuesday": "ಮಂಗಳವಾರ", "Wednesday": "ಬುಧವಾರ",
-        "Thursday": "गुರುವಾರ", "Friday": "ಶುಕ್ರವಾರ", "Saturday": "ಶನಿವಾರ"
+        "Thursday": "ಗುರುವಾರ", "Friday": "ಶುಕ್ರವಾರ", "Saturday": "ಶನಿವಾರ"
     }
     
     meal_plan = {}
