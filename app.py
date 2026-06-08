@@ -102,9 +102,10 @@ def init_database():
         return f"Error: {str(e)}", 500
 
 # ═══════════════════════════════════════════════════════════
-# PHASE 1 — AUTH
+# PHASE 1 — AUTH (Unified Routes)
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/auth/signup', methods=['POST'])
+@app.route('/api/signup', methods=['POST'])  # Supports both endpoint calls safely
 def signup():
     data = request.json or {}
     name        = data.get('name', '').strip()
@@ -131,6 +132,8 @@ def signup():
         )
         conn.commit()
         teacher = db_fetchone(conn, 'SELECT * FROM teachers WHERE phone = %s', (phone,))
+    except Exception as e:
+        return jsonify({'error': f'Database error during registration: {str(e)}'}), 500
     finally:
         conn.close()
 
@@ -145,6 +148,7 @@ def signup():
     })
 
 @app.route('/api/auth/login', methods=['POST'])
+@app.route('/api/login', methods=['POST'])  # Supports both endpoint calls safely
 def login():
     data     = request.json or {}
     phone    = data.get('phone', '').strip()
@@ -156,6 +160,8 @@ def login():
     conn = get_db_connection()
     try:
         teacher = db_fetchone(conn, 'SELECT * FROM teachers WHERE phone = %s', (phone,))
+    except Exception as e:
+        return jsonify({'error': f'Database lookup error: {str(e)}'}), 500
     finally:
         conn.close()
 
@@ -419,7 +425,6 @@ def get_saved_plans():
     finally:
         conn.close()
 
-    # Convert datetime to string for JSON
     for p in plans:
         if p.get('created_at'):
             p['created_at'] = str(p['created_at'])
@@ -446,7 +451,6 @@ def get_nutrition_library():
         """
         params = []
 
-        # Search filter
         if search_query:
             query += """
                 AND (
@@ -458,22 +462,17 @@ def get_nutrition_library():
             like = f"%{search_query}%"
             params.extend([like, like, like])
 
-        # Category filter
         if category and category != "all":
             query += " AND LOWER(category) = %s"
             params.append(category)
 
-        # Preference filter
         if preference == "veg":
             query += " AND is_veg = 1"
-
         elif preference == "egg":
             query += " AND is_egg = 1"
-
         elif preference == "nonveg":
             query += " AND is_veg = 0"
 
-        # Backward compatibility
         if veg_only:
             query += " AND is_veg = 1"
 
@@ -481,18 +480,16 @@ def get_nutrition_library():
 
         cur = conn.cursor()
         cur.execute(query, params)
-        foods = cur.fetchall()
-
-        print(f"Category={category}")
-        print(f"Preference={preference}")
-        print(f"Foods found={len(foods)}")
+        # Using row factory/descriptions mapping if setup in DB connection wrapper
+        rows = cur.fetchall()
+        cols = [desc[0] for desc in cur.description]
+        foods = [dict(zip(cols, row)) for row in rows]
 
         return jsonify(foods)
 
     except Exception as e:
         print("Nutrition API Error:", str(e))
         return jsonify({"error": str(e)}), 500
-
     finally:
         conn.close()
 
@@ -532,49 +529,6 @@ Question: {question if question else f'What should {student_name} eat this week?
     except Exception as e:
         print("Groq Error:", str(e))
         return jsonify({"reply": "AI Advisor is temporarily unavailable. Please try again."}), 200
-
-from werkzeug.security import generate_password_hash, check_password_hash
-
-@app.route('/api/signup', methods=['POST'])
-def signup():
-    data = request.json or {}
-    phone = data.get('phone', '').strip()
-    password = data.get('password', '').strip()
-    name = data.get('name', '').strip()
-    school_name = data.get('school_name', '').strip()
-    district = data.get('district', '').strip()
-
-    if not phone or not password:
-        return jsonify({"error": "Phone and password required"}), 400
-
-    conn = get_db_connection()
-    try:
-        conn.execute(
-            "INSERT INTO teachers (name, school_name, district, phone, password_hash) VALUES (?, ?, ?, ?, ?)",
-            (name, school_name, district, phone, generate_password_hash(password))
-        )
-        conn.commit()
-        return jsonify({"success": True})
-    except sqlite3.IntegrityError:
-        return jsonify({"error": "Phone number already registered"}), 409
-    finally:
-        conn.close()
-
-@app.route('/api/login', methods=['POST'])
-def login():
-    data = request.json or {}
-    phone = data.get('phone', '').strip()
-    password = data.get('password', '').strip()
-
-    conn = get_db_connection()
-    teacher = conn.execute("SELECT * FROM teachers WHERE phone = ?", (phone,)).fetchone()
-    conn.close()
-
-    if not teacher or not check_password_hash(teacher['password_hash'], password):
-        return jsonify({"error": "Invalid phone number or password"}), 401
-
-    return jsonify({"success": True, "teacher_id": teacher['id'], "name": teacher['name']})
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
