@@ -13,7 +13,9 @@ from meal_generator import generate_weekly_meal_plan
 
 app = Flask(__name__, static_folder='static')
 app.secret_key = os.environ.get('SECRET_KEY', 'nutriprint-secret-2026-yit')
-CORS(app, supports_credentials=True)
+
+# CORS policy matches credential configurations needed for active session mechanics
+CORS(app, supports_credentials=True, origins=[os.environ.get('FRONTEND_URL', 'http://localhost:5001')])
 
 with app.app_context():
     try:
@@ -29,47 +31,48 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def db_fetchone(conn, query, params=()):
-    """Execute query and fetch one row as dict."""
-    cur = conn.cursor()
-    cur.execute(query, params)
-    row = cur.fetchone()
-    if row is None:
-        return None
-    cols = [desc[0] for desc in cur.description]
-    return dict(zip(cols, row))
+    """Execute query and fetch one row as dict securely."""
+    with conn.cursor() as cur:
+        cur.execute(query, params)
+        row = cur.fetchone()
+        if row is None:
+            return None
+        cols = [desc[0] for desc in cur.description]
+        return dict(zip(cols, row))
 
 def db_fetchall(conn, query, params=()):
-    """Execute query and fetch all rows as list of dicts."""
-    cur = conn.cursor()
-    cur.execute(query, params)
-    rows = cur.fetchall()
-    if not rows:
-        return []
-    cols = [desc[0] for desc in cur.description]
-    return [dict(zip(cols, row)) for row in rows]
+    """Execute query and fetch all rows as list of dicts securely."""
+    with conn.cursor() as cur:
+        cur.execute(query, params)
+        rows = cur.fetchall()
+        if not rows:
+            return []
+        cols = [desc[0] for desc in cur.description]
+        return [dict(zip(cols, row)) for row in rows]
 
 def db_execute(conn, query, params=()):
-    """Execute insert/update/delete query."""
-    cur = conn.cursor()
-    cur.execute(query, params)
+    """Execute insert/update/delete query safely within transaction block."""
+    with conn.cursor() as cur:
+        cur.execute(query, params)
 
 def get_current_teacher():
     teacher_id = session.get('teacher_id')
-
-    print("SESSION =", dict(session))
-    print("teacher_id =", teacher_id, type(teacher_id))
-
     if not teacher_id:
         return None
 
     conn = get_db_connection()
-    teacher = db_fetchone(
-        conn,
-        'SELECT * FROM teachers WHERE id = %s',
-        (teacher_id,)
-    )
-    conn.close()
-    return teacher
+    try:
+        teacher = db_fetchone(
+            conn,
+            'SELECT id, name, school_name, district, phone FROM teachers WHERE id = %s',
+            (teacher_id,)
+        )
+        return teacher
+    except Exception as e:
+        print(f"Error checking teacher session: {e}")
+        return None
+    finally:
+        conn.close()
 
 # ── Static files ──────────────────────────────────────────
 @app.route('/')
@@ -105,7 +108,7 @@ def init_database():
 # PHASE 1 — AUTH (Unified Routes)
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/auth/signup', methods=['POST'])
-@app.route('/api/signup', methods=['POST'])  # Supports both endpoint calls safely
+@app.route('/api/signup', methods=['POST'])
 def signup():
     data = request.json or {}
     name        = data.get('name', '').strip()
@@ -133,6 +136,7 @@ def signup():
         conn.commit()
         teacher = db_fetchone(conn, 'SELECT * FROM teachers WHERE phone = %s', (phone,))
     except Exception as e:
+        conn.rollback()
         return jsonify({'error': f'Database error during registration: {str(e)}'}), 500
     finally:
         conn.close()
@@ -148,7 +152,7 @@ def signup():
     })
 
 @app.route('/api/auth/login', methods=['POST'])
-@app.route('/api/login', methods=['POST'])  # Supports both endpoint calls safely
+@app.route('/api/login', methods=['POST'])
 def login():
     data     = request.json or {}
     phone    = data.get('phone', '').strip()
@@ -218,12 +222,23 @@ def get_students():
                 'SELECT * FROM bmi_records WHERE student_id = %s ORDER BY recorded_at DESC LIMIT 1',
                 (s['id'],)
             )
+            # Normalize numeric data types coming back from Postgres
+            if bmi:
+                bmi['height'] = float(bmi['height']) if bmi.get('height') else 0
+                bmi['weight'] = float(bmi['weight']) if bmi.get('weight') else 0
+                bmi['bmi'] = float(bmi['bmi']) if bmi.get('bmi') else 0
+                bmi['recorded_at'] = str(bmi['recorded_at'])
+
             s['latest_bmi'] = bmi
 
             history = db_fetchall(conn,
                 'SELECT bmi, status, recorded_at FROM bmi_records WHERE student_id = %s ORDER BY recorded_at',
                 (s['id'],)
             )
+            for h in history:
+                h['bmi'] = float(h['bmi']) if h.get('bmi') else 0
+                h['recorded_at'] = str(h['recorded_at'])
+
             s['bmi_history'] = history
             result.append(s)
     finally:
@@ -256,6 +271,9 @@ def add_student():
             'SELECT * FROM students WHERE teacher_id = %s AND name = %s ORDER BY id DESC LIMIT 1',
             (teacher['id'], name)
         )
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': f'Failed to append student record: {str(e)}'}), 500
     finally:
         conn.close()
 
@@ -275,6 +293,9 @@ def save_bmi(student_id):
             (student_id, data.get('height'), data.get('weight'), data.get('bmi'), data.get('status'))
         )
         conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
     finally:
         conn.close()
 
@@ -289,9 +310,13 @@ def delete_student(student_id):
     conn = get_db_connection()
     try:
         db_execute(conn, 'DELETE FROM bmi_records WHERE student_id = %s', (student_id,))
+        db_execute(conn, 'DELETE FROM saved_plans WHERE student_id = %s', (student_id,))
         db_execute(conn, 'DELETE FROM students WHERE id = %s AND teacher_id = %s',
                    (student_id, teacher['id']))
         conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': f'Transaction rolled back: {str(e)}'}), 500
     finally:
         conn.close()
 
@@ -303,8 +328,8 @@ def delete_student(student_id):
 @app.route('/api/generate', methods=['POST'])
 def generate_plan():
     data = request.json or {}
-
     teacher = get_current_teacher()
+    
     if teacher:
         school_name  = data.get('school_name')  or teacher['school_name']
         teacher_name = data.get('teacher_name') or teacher['name']
@@ -339,23 +364,31 @@ def generate_plan():
         if teacher:
             conn = get_db_connection()
             try:
+                teacher_id_val = teacher['id']
+                # Safeguard potential integer conversions for Postgres student links
+                student_id_val = int(student_id) if student_id else None
+
                 db_execute(conn, '''
-                    INSERT INTO saved_plans
-                    (qr_code, teacher_id, student_id, plan_data, school_name, teacher_name,
+                    INSERT INTO saved_plans 
+                    (qr_code, teacher_id, student_id, plan_data, school_name, teacher_name, 
                      student_name, bmi_status, age_group, preference, region, month)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ''', (
-                    qr_code, teacher['id'], student_id, json.dumps(plan),
+                    qr_code, teacher_id_val, student_id_val, json.dumps(plan),
                     school_name, teacher_name, student_name, bmi_status,
                     age_group, preference, region, month
                 ))
-                if student_id and bmi_status and data.get('bmi_value'):
+                
+                if student_id_val and bmi_status and data.get('bmi_value'):
                     db_execute(conn,
                         'INSERT INTO bmi_records (student_id, height, weight, bmi, status) VALUES (%s, %s, %s, %s, %s)',
-                        (student_id, data.get('height', 0), data.get('weight', 0),
+                        (student_id_val, data.get('height', 0), data.get('weight', 0),
                          data.get('bmi_value', 0), bmi_status)
                     )
                 conn.commit()
+            except Exception as db_err:
+                conn.rollback()
+                print(f"Error saving tracking metrics: {db_err}")
             finally:
                 conn.close()
 
@@ -366,7 +399,7 @@ def generate_plan():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"error": f"Error: {str(e)}"}), 500
+        return jsonify({"error": f"Plan Generation Failure: {str(e)}"}), 500
 
 @app.route('/plan/<qr_code>')
 def view_plan(qr_code):
@@ -376,13 +409,11 @@ def view_plan(qr_code):
 def get_plan(qr_code):
     conn = get_db_connection()
     try:
-        plan_row = db_fetchone(conn,
-            'SELECT * FROM saved_plans WHERE qr_code = %s', (qr_code,)
-        )
+        plan_row = db_fetchone(conn, 'SELECT * FROM saved_plans WHERE qr_code = %s', (qr_code,))
         if not plan_row:
             return jsonify({'error': 'Plan not found'}), 404
 
-        plan_data = json.loads(plan_row['plan_data'])
+        plan_data = json.loads(plan_row['plan_data']) if isinstance(plan_row['plan_data'], str) else plan_row['plan_data']
         foods_list = db_fetchall(conn, 'SELECT * FROM foods')
         foods = {row['name_en']: row for row in foods_list}
     finally:
@@ -442,23 +473,12 @@ def get_nutrition_library():
     veg_only = request.args.get('veg_only', 'false').lower() == 'true'
 
     conn = get_db_connection()
-
     try:
-        query = """
-            SELECT *
-            FROM foods
-            WHERE 1=1
-        """
+        query = "SELECT * FROM foods WHERE 1=1"
         params = []
 
         if search_query:
-            query += """
-                AND (
-                    name_en ILIKE %s
-                    OR name_kn ILIKE %s
-                    OR category ILIKE %s
-                )
-            """
+            query += " AND (name_en ILIKE %s OR name_kn ILIKE %s OR category ILIKE %s)"
             like = f"%{search_query}%"
             params.extend([like, like, like])
 
@@ -466,25 +486,16 @@ def get_nutrition_library():
             query += " AND LOWER(category) = %s"
             params.append(category)
 
-        if preference == "veg":
-            query += " AND is_veg = 1"
+        # Updated for strict explicit validation mappings required by PostgreSQL structures
+        if preference == "veg" or veg_only:
+            query += " AND (is_veg = TRUE OR is_veg = 1)"
         elif preference == "egg":
-            query += " AND is_egg = 1"
+            query += " AND (is_egg = TRUE OR is_egg = 1)"
         elif preference == "nonveg":
-            query += " AND is_veg = 0"
-
-        if veg_only:
-            query += " AND is_veg = 1"
+            query += " AND (is_veg = FALSE OR is_veg = 0)"
 
         query += " ORDER BY id"
-
-        cur = conn.cursor()
-        cur.execute(query, params)
-        # Using row factory/descriptions mapping if setup in DB connection wrapper
-        rows = cur.fetchall()
-        cols = [desc[0] for desc in cur.description]
-        foods = [dict(zip(cols, row)) for row in rows]
-
+        foods = db_fetchall(conn, query, params)
         return jsonify(foods)
 
     except Exception as e:
@@ -494,15 +505,16 @@ def get_nutrition_library():
         conn.close()
 
 # ═══════════════════════════════════════════════════════════
-# PHASE 4 — AI ADVISOR (Groq)
+# PHASE 4 — AI ADVISOR (Groq Unified Fallbacks)
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/ai-advisor', methods=['POST'])
+@app.route('/api/ai/advise', methods=['POST'])
 def ai_advisor():
     data         = request.json or {}
-    student_name = data.get('student_name', 'the student')
+    student_name = data.get('student_name') or data.get('name') or 'the student'
     age          = data.get('age', 10)
     gender       = data.get('gender', 'Boy')
-    bmi_status   = data.get('bmi_status', 'Normal')
+    bmi_status   = data.get('bmi_status') or data.get('status') or 'Normal'
     bmi_value    = data.get('bmi_value', '')
     preference   = data.get('preference', 'Vegetarian')
     region       = data.get('region', 'Karnataka')
@@ -524,11 +536,14 @@ Question: {question if question else f'What should {student_name} eat this week?
             max_tokens=300
         )
         reply = response.choices[0].message.content
-        return jsonify({"reply": reply})
+        return jsonify({"reply": reply, "success": True})
 
     except Exception as e:
         print("Groq Error:", str(e))
-        return jsonify({"reply": "AI Advisor is temporarily unavailable. Please try again."}), 200
+        return jsonify({
+            "reply": "AI Advisor is temporarily offline compiling regional data blueprints. Please retry in a moment.",
+            "success": False
+        }), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
