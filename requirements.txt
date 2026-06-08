@@ -5,3 +5,4 @@ qrcode[pil]
 Pillow
 groq
 psycopg2-binary
+werkzeug
