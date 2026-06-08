@@ -10,36 +10,31 @@ from flask_cors import CORS
 from database import init_db, get_db_connection
 from meal_generator import generate_weekly_meal_plan
 
-# Initialize Flask and point it to your 'static' folder containing your HTML/CSS/JS assets
+# Tells Flask to serve frontend assets directly out of the static directory
 app = Flask(__name__, static_folder='static', static_url_path='')
-# Secure session management fallback key for local staging environments
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "super-secret-dev-key")
 
-# Enable cross-origin requests securely for cookie-based session architectures
+# Enable tracking session cookies across deployment environments
 CORS(app, supports_credentials=True)
 
-# Run verification and seed the foods inventory tables if empty on initialization
+# Run schema setups
 init_db()
 
-# ── FRONTEND HTML SERVING ROUTES ───────────────────────────────
+# ── FRONTEND PAGE ROUTING ─────────────────────────────────────
 
 @app.route('/')
 def serve_index():
-    """Serves the main landing or login page (index.html) from the static folder."""
     return app.send_static_file('index.html')
 
 @app.route('/plan')
 def serve_plan_page():
-    """Serves the interactive meal builder panel page (plan.html)."""
     return app.send_static_file('plan.html')
 
 @app.route('/plan1')
 def serve_plan1_page():
-    """Serves your alternative/backup plan interface page (plan1.html)."""
     return app.send_static_file('plan1.html')
 
-
-# ── AUTHENTICATION ROUTES ─────────────────────────────────────
+# ── AUTHENTICATION ENDPOINTS ──────────────────────────────────
 
 @app.route('/api/auth/signup', methods=['POST'])
 def signup():
@@ -54,7 +49,6 @@ def signup():
         return jsonify({"error": "All fields are required"}), 400
 
     password_hash = generate_password_hash(password)
-
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
@@ -64,7 +58,6 @@ def signup():
             ''', (name, school_name, district, phone, password_hash))
             teacher = cursor.fetchone()
             conn.commit()
-            
             session['teacher_id'] = teacher['id']
             session['teacher_name'] = teacher['name']
             return jsonify({"message": "Registration successful", "teacher": teacher}), 201
@@ -114,8 +107,7 @@ def logout():
     session.clear()
     return jsonify({"message": "Logged out successfully"}), 200
 
-
-# ── STUDENT & BMI MANAGEMENT ──────────────────────────────────
+# ── HEALTH PROFILE LOGS ──────────────────────────────────────
 
 @app.route('/api/students', methods=['POST'])
 def add_student_and_bmi():
@@ -127,57 +119,42 @@ def add_student_and_bmi():
     name = data.get('name')
     age = data.get('age')
     gender = data.get('gender')
-    height = data.get('height')  # parsed in cm
-    weight = data.get('weight')  # parsed in kg
+    height = data.get('height')
+    weight = data.get('weight')
 
     if not all([name, age, gender, height, weight]):
-        return jsonify({"error": "Missing student demographic or health metrics"}), 400
+        return jsonify({"error": "Missing student metrics"}), 400
 
-    # Math computation for BMI: weight (kg) / height (m)^2
     height_m = float(height) / 100.0
     bmi_val = round(float(weight) / (height_m ** 2), 1)
 
-    # Simple categorization limits based on WHO adolescent guidelines
-    if bmi_val < 18.5:
-        status = "Underweight"
-    elif 18.5 <= bmi_val < 25.0:
-        status = "Normal"
-    elif 25.0 <= bmi_val < 30.0:
-        status = "Overweight"
-    else:
-        status = "Obese"
+    if bmi_val < 18.5: status = "Underweight"
+    elif 18.5 <= bmi_val < 25.0: status = "Normal"
+    elif 25.0 <= bmi_val < 30.0: status = "Overweight"
+    else: status = "Obese"
 
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # 1. Insert Student profile
             cursor.execute('''
                 INSERT INTO students (teacher_id, name, age, gender)
                 VALUES (%s, %s, %s, %s) RETURNING id
             ''', (teacher_id, name, int(age), gender))
             student_id = cursor.fetchone()['id']
 
-            # 2. Append initial BMI log event record
             cursor.execute('''
                 INSERT INTO bmi_records (student_id, height, weight, bmi, status)
                 VALUES (%s, %s, %s, %s, %s)
             ''', (student_id, float(height), float(weight), bmi_val, status))
-            
             conn.commit()
-            return jsonify({
-                "message": "Student record updated",
-                "student_id": student_id,
-                "bmi": bmi_val,
-                "status": status
-            }), 201
+            return jsonify({"message": "Student saved", "student_id": student_id, "bmi": bmi_val, "status": status}), 201
     except Exception as e:
         conn.rollback()
-        return jsonify({"error": f"Failed to save profiles: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
 
-
-# ── AI ENGINE GENERATOR ROUTE ──────────────────────────────────
+# ── MEAL GENERATION ENGINE ────────────────────────────────────
 
 @app.route('/api/meals/generate', methods=['POST'])
 def generate_plan():
@@ -186,55 +163,42 @@ def generate_plan():
         return jsonify({"error": "Authentication required"}), 401
 
     data = request.get_json() or {}
-    
-    # Extract parameters, falling back to session profiles if blank
     school_name = session.get('school_name', data.get('school_name', 'Government School'))
     teacher_name = session.get('teacher_name', data.get('teacher_name', 'Teacher'))
-    
     age_group = data.get('age_group', '9-12')
     preference = data.get('preference', 'Vegetarian')
     region = session.get('district', data.get('region', 'All'))
     month = data.get('month', 'January')
-    
     student_name = data.get('student_name', '')
     bmi_status = data.get('bmi_status', '')
     optimization_strategy = data.get('optimization_strategy', 'standard')
 
     try:
         plan = generate_weekly_meal_plan(
-            school_name=school_name,
-            teacher_name=teacher_name,
-            age_group=age_group,
-            preference=preference,
-            region=region,
-            month=month,
-            student_name=student_name,
-            bmi_status=bmi_status,
-            optimization_strategy=optimization_strategy
+            school_name=school_name, teacher_name=teacher_name, age_group=age_group,
+            preference=preference, region=region, month=month,
+            student_name=student_name, bmi_status=bmi_status, optimization_strategy=optimization_strategy
         )
         return jsonify(plan), 200
     except Exception as e:
-        return jsonify({"error": f"Failed compiling allocation variants: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
-
-# ── PLAN PERSISTENCE INTERFACES ───────────────────────────────
+# ── PERSISTENCE & QR CODE STORAGE ─────────────────────────────
 
 @app.route('/api/plans/save', methods=['POST'])
 def save_plan():
     teacher_id = session.get('teacher_id')
     if not teacher_id:
-        return jsonify({"error": "Authentication credentials required"}), 401
+        return jsonify({"error": "Authentication required"}), 401
 
     data = request.get_json() or {}
     meal_plan_data = data.get('meal_plan')
     school_details = data.get('school_details', {})
 
     if not meal_plan_data:
-        return jsonify({"error": "No meal plan array structure sent"}), 400
+        return jsonify({"error": "No meal plan matrix data sent"}), 400
 
-    # Build unique short string token representing our internal QR code index identifier
     qr_token = f"MEAL-{uuid.uuid4().hex[:8].upper()}"
-
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
@@ -243,63 +207,35 @@ def save_plan():
                     qr_code, teacher_id, plan_data, school_name, teacher_name,
                     student_name, bmi_status, age_group, preference, region, month
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING qr_code
             ''', (
-                qr_token,
-                teacher_id,
-                json.dumps(meal_plan_data),
-                school_details.get('school_name', 'Unknown School'),
-                school_details.get('teacher_name', 'Teacher'),
-                school_details.get('student_name', ''),
-                school_details.get('bmi_status', ''),
-                school_details.get('age_group', ''),
-                school_details.get('preference', ''),
-                school_details.get('region', ''),
-                school_details.get('month', '')
+                qr_token, teacher_id, json.dumps(meal_plan_data),
+                school_details.get('school_name'), school_details.get('teacher_name'),
+                school_details.get('student_name'), school_details.get('bmi_status'),
+                school_details.get('age_group'), school_details.get('preference'),
+                school_details.get('region'), school_details.get('month')
             ))
             conn.commit()
-            return jsonify({"message": "Plan stored safely", "qr_code": qr_token}), 201
+            return jsonify({"message": "Plan saved", "qr_code": qr_token}), 201
     except Exception as e:
         conn.rollback()
-        return jsonify({"error": f"Persistence storage runtime failure: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
 
-
-# ── DYNAMIC QR CODE RENDERING ENGINE ──────────────────────────
-
 @app.route('/api/plans/qr/<qr_code_string>', methods=['GET'])
 def get_qr_image(qr_code_string):
-    """
-    Generates a high-quality physical QR Code PNG image stream in real-time
-    corresponding to the unique menu allocation transaction code.
-    """
-    if not qr_code_string:
-        return jsonify({"error": "Missing QR identifier token"}), 400
-        
     try:
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
-        )
+        qr = qrcode.QRCode(version=1, box_size=10, border=4)
         qr.add_data(qr_code_string)
         qr.make(fit=True)
-
         img = qr.make_image(fill_color="black", back_color="white")
         
-        # Stream vector content dynamically through system RAM instead of clogging disk write buffers
         img_buffer = io.BytesIO()
         img.save(img_buffer, format="PNG")
         img_buffer.seek(0)
-        
         return send_file(img_buffer, mimetype='image/png')
-        
     except Exception as e:
-        return jsonify({"error": f"QR Engine render fault: {str(e)}"}), 500
-
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    # Binds securely across hosting fabrics; for Render production deployments, gunicorn overrides this.
     app.run(host='0.0.0.0', port=int(os.getenv("PORT", 5000)), debug=True)
