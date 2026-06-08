@@ -430,6 +430,14 @@ const app = {
         data.qr_image_url = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(planUrl)}`;
       }
       this.lastPlanData = data;
+      // FIX: Update the hardcoded WhatsApp button to use the real plan URL
+      if (data.qr_code) {
+      const planUrl = `${window.location.origin}/plan/${data.qr_code}`;
+      const hardcodedWaBtn = document.querySelector('.poster-actions-bar button[onclick*="wa.me"]');
+      if (hardcodedWaBtn) {
+        hardcodedWaBtn.setAttribute('onclick', `app.shareViaWhatsApp('${planUrl}')`);
+      }
+    }
       this.aiAdviceNotes = []; // Reset AI notes on new plan
       document.getElementById('poster-ai-advice')?.remove();
       this.renderPoster(data);
@@ -492,7 +500,17 @@ const app = {
       if (genSuccess) genSuccess.appendChild(box);
     }
   },
-
+  shareViaWhatsApp(planUrl) {
+  if (!planUrl && this.lastPlanData?.qr_code) {
+    planUrl = `${window.location.origin}/plan/${this.lastPlanData.qr_code}`;
+  }
+  if (!planUrl) { alert('Please generate a plan first.'); return; }
+  const studentName = document.getElementById('student_name')?.value || 'your child';
+  const schoolName  = document.getElementById('school_name')?.value  || 'the school';
+  const month       = document.getElementById('month')?.value        || 'this month';
+  const message = `🌾 *NutriPrint — Healthy Meal Plan*\n\nNamaskara! 🙏\n\n${studentName}'s personalised weekly meal plan for *${month}* from *${schoolName}* is ready.\n\n📋 *View full plan with recipes here:*\n${planUrl}\n\n✅ Balanced meals using local Karnataka foods\n✅ Under ₹50 per meal\n\n— NutriPrint, Yenepoya Institute of Technology 🌱`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+},
   sendWhatsApp(planUrl) {
     const input    = document.getElementById('parent-whatsapp-number');
     const statusEl = document.getElementById('wa-status-msg');
