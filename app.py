@@ -533,6 +533,48 @@ Question: {question if question else f'What should {student_name} eat this week?
         print("Groq Error:", str(e))
         return jsonify({"reply": "AI Advisor is temporarily unavailable. Please try again."}), 200
 
+from werkzeug.security import generate_password_hash, check_password_hash
+
+@app.route('/api/signup', methods=['POST'])
+def signup():
+    data = request.json or {}
+    phone = data.get('phone', '').strip()
+    password = data.get('password', '').strip()
+    name = data.get('name', '').strip()
+    school_name = data.get('school_name', '').strip()
+    district = data.get('district', '').strip()
+
+    if not phone or not password:
+        return jsonify({"error": "Phone and password required"}), 400
+
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            "INSERT INTO teachers (name, school_name, district, phone, password_hash) VALUES (?, ?, ?, ?, ?)",
+            (name, school_name, district, phone, generate_password_hash(password))
+        )
+        conn.commit()
+        return jsonify({"success": True})
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "Phone number already registered"}), 409
+    finally:
+        conn.close()
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json or {}
+    phone = data.get('phone', '').strip()
+    password = data.get('password', '').strip()
+
+    conn = get_db_connection()
+    teacher = conn.execute("SELECT * FROM teachers WHERE phone = ?", (phone,)).fetchone()
+    conn.close()
+
+    if not teacher or not check_password_hash(teacher['password_hash'], password):
+        return jsonify({"error": "Invalid phone number or password"}), 401
+
+    return jsonify({"success": True, "teacher_id": teacher['id'], "name": teacher['name']})
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
