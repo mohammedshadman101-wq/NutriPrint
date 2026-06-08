@@ -55,10 +55,19 @@ def db_execute(conn, query, params=()):
 
 def get_current_teacher():
     teacher_id = session.get('teacher_id')
+
+    print("SESSION =", dict(session))
+    print("teacher_id =", teacher_id, type(teacher_id))
+
     if not teacher_id:
         return None
+
     conn = get_db_connection()
-    teacher = db_fetchone(conn, 'SELECT * FROM teachers WHERE id = %s', (teacher_id,))
+    teacher = db_fetchone(
+        conn,
+        'SELECT * FROM teachers WHERE id = %s',
+        (teacher_id,)
+    )
     conn.close()
     return teacher
 
