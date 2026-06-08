@@ -10,7 +10,8 @@ from flask_cors import CORS
 from database import init_db, get_db_connection
 from meal_generator import generate_weekly_meal_plan
 
-app = Flask(__name__)
+# Initialize Flask and point it to your 'static' folder containing your HTML/CSS/JS assets
+app = Flask(__name__, static_folder='static', static_url_path='')
 # Secure session management fallback key for local staging environments
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "super-secret-dev-key")
 
@@ -19,6 +20,24 @@ CORS(app, supports_credentials=True)
 
 # Run verification and seed the foods inventory tables if empty on initialization
 init_db()
+
+# ── FRONTEND HTML SERVING ROUTES ───────────────────────────────
+
+@app.route('/')
+def serve_index():
+    """Serves the main landing or login page (index.html) from the static folder."""
+    return app.send_static_file('index.html')
+
+@app.route('/plan')
+def serve_plan_page():
+    """Serves the interactive meal builder panel page (plan.html)."""
+    return app.send_static_file('plan.html')
+
+@app.route('/plan1')
+def serve_plan1_page():
+    """Serves your alternative/backup plan interface page (plan1.html)."""
+    return app.send_static_file('plan1.html')
+
 
 # ── AUTHENTICATION ROUTES ─────────────────────────────────────
 
@@ -95,6 +114,7 @@ def logout():
     session.clear()
     return jsonify({"message": "Logged out successfully"}), 200
 
+
 # ── STUDENT & BMI MANAGEMENT ──────────────────────────────────
 
 @app.route('/api/students', methods=['POST'])
@@ -156,6 +176,7 @@ def add_student_and_bmi():
     finally:
         conn.close()
 
+
 # ── AI ENGINE GENERATOR ROUTE ──────────────────────────────────
 
 @app.route('/api/meals/generate', methods=['POST'])
@@ -194,6 +215,7 @@ def generate_plan():
         return jsonify(plan), 200
     except Exception as e:
         return jsonify({"error": f"Failed compiling allocation variants: {str(e)}"}), 500
+
 
 # ── PLAN PERSISTENCE INTERFACES ───────────────────────────────
 
@@ -243,6 +265,7 @@ def save_plan():
     finally:
         conn.close()
 
+
 # ── DYNAMIC QR CODE RENDERING ENGINE ──────────────────────────
 
 @app.route('/api/plans/qr/<qr_code_string>', methods=['GET'])
@@ -266,7 +289,7 @@ def get_qr_image(qr_code_string):
 
         img = qr.make_image(fill_color="black", back_color="white")
         
-        # Stream vector content dynamically through volatile system RAM instead of clogging disk write buffers
+        # Stream vector content dynamically through system RAM instead of clogging disk write buffers
         img_buffer = io.BytesIO()
         img.save(img_buffer, format="PNG")
         img_buffer.seek(0)
@@ -275,6 +298,7 @@ def get_qr_image(qr_code_string):
         
     except Exception as e:
         return jsonify({"error": f"QR Engine render fault: {str(e)}"}), 500
+
 
 if __name__ == '__main__':
     # Binds securely across hosting fabrics; for Render production deployments, gunicorn overrides this.
